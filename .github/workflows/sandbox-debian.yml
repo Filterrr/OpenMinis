@@ -58,13 +58,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install host tooling
-        run: |
-          sudo apt-get update -qq
-          # qemu-user-static is what lets an x86_64 runner execute the aarch64
-          # binaries inside the rootfs (apt-get, dpkg's maintainer scripts).
-          # Without it the build cannot bake the base package set at all.
-          sudo apt-get install -y -qq qemu-user-static
+      # aarch64 emulation on an x86_64 runner.
+      #
+      # Deliberately NOT `apt-get install qemu-user-static`: that package no
+      # longer exists on the runner image (ubuntu-26.04 replaced it with
+      # qemu-user + qemu-user-binfmt, and qemu-user ships a *dynamically linked*
+      # /usr/bin/qemu-aarch64 that cannot be copied into a rootfs). This action
+      # registers binfmt_misc handlers backed by static binaries, which is what
+      # actually works; prepare_android_sandbox.sh probes for exactly that.
+      #
+      # It is also faster than bootstrapping apt.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Self-test the asset checker
         run: |
@@ -100,16 +106,31 @@ jobs:
       - name: Boot the extracted rootfs
         run: |
           set -euo pipefail
-          # This host is x86_64, so run the aarch64 userspace through qemu —
-          # the same way the build script does internally. It is the closest
-          # thing to a device boot CI can do: proof that the interpreter, the
-          # coreutils set, apt and the baked apt sources actually work.
-          sudo cp "$(command -v qemu-aarch64-static)" /tmp/roundtrip/usr/bin/
+          # Run the aarch64 userspace the way the build script does, so this is
+          # the closest thing to a device boot CI can do: proof that the
+          # interpreter, the coreutils set, apt and the baked apt sources work.
+          #
+          # Two mechanisms, because the runner image decides which one exists:
+          # an explicit static qemu if present, otherwise binfmt_misc (what
+          # docker/setup-qemu-action gives us) with a plain chroot.
+          export PATH="/usr/bin:/bin:$PATH"
+          if command -v qemu-aarch64-static >/dev/null 2>&1; then
+            echo "using qemu-aarch64-static"
+            sudo cp "$(command -v qemu-aarch64-static)" /tmp/roundtrip/usr/bin/
+            QEMU=/usr/bin/qemu-aarch64-static
+          else
+            echo "assuming binfmt_misc handles aarch64 (docker/setup-qemu-action)"
+            QEMU=""
+            if ! sudo chroot /tmp/roundtrip /bin/true; then
+              echo "::error::no aarch64 emulation available — neither qemu-aarch64-static nor a binfmt handler"
+              exit 1
+            fi
+          fi
           run() {
             sudo chroot /tmp/roundtrip /usr/bin/env -i \
               PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
               HOME=/root TMPDIR=/tmp LC_ALL=C \
-              /usr/bin/qemu-aarch64-static "$@"
+              $QEMU "$@"
           }
 
           run /bin/bash -c 'cat /etc/debian_version'

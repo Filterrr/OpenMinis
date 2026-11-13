@@ -78,6 +78,17 @@ ROOTFS_ASSET_NAME="debian-rootfs.tar.gz"
 ROOTFS_FILE="$ASSETS_DIR/$ROOTFS_ASSET_NAME"
 PROOT_FILE="$ASSETS_DIR/proot-aarch64"
 
+# How the build host executes the rootfs's aarch64 binaries. Set by
+# detect_runner(); the two must be declared here because `set -u` is on.
+#
+# QEMU_IN_ROOTFS: path of the qemu shim inside the rootfs, or empty when the
+# host runs aarch64 natively or binfmt_misc handles it transparently.
+# RUNNER_DETECTED: 0 until detect_runner() has chosen a mechanism. Tracked
+# separately because QEMU_IN_ROOTFS is legitimately empty in two of the three
+# mechanisms, so it cannot double as "already detected".
+QEMU_IN_ROOTFS=""
+RUNNER_DETECTED=0
+
 # --- option parsing ----------------------------------------------------------
 
 DO_BAKE=1
@@ -255,34 +266,75 @@ chroot_run() {
         "$@"
 }
 
-# Picks how to execute aarch64 binaries: natively, or through qemu.
+# Picks how to execute aarch64 binaries inside the rootfs. Three ways exist in
+# the wild and the choice is made by probing, not by assuming:
+#
+#   1. the host IS aarch64 — nothing to do;
+#   2. an explicit `qemu-aarch64-static` is on PATH — copy it into the rootfs
+#      and exec through it, the way `debootstrap --foreign` does. Self-contained
+#      and does not need binfmt_misc registered;
+#   3. binfmt_misc already routes aarch64 — probed by actually running a binary,
+#      because that is the only honest test. This is how GitHub runners work
+#      now: on ubuntu-26.04 there is no `qemu-user-static` package at all
+#      (`qemu-user` ships a dynamically linked /usr/bin/qemu-aarch64 that cannot
+#      be copied into a rootfs), and the supported route is
+#      docker/setup-qemu-action, which registers handlers with static binaries
+#      on the host kernel.
+#
+# Runners moved from 24.04 to 26.04 and silently broke the old assumption, so
+# the failure mode here is deliberately explicit rather than a guess.
 detect_runner() {
     local root="$1"
-    if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
-        log "host is aarch64 — executing the rootfs natively"
-        QEMU_IN_ROOTFS=""
-        return 0
-    fi
+
+    case "$(uname -m)" in
+        aarch64|arm64)
+            log "host is $(uname -m) — executing the rootfs natively"
+            QEMU_IN_ROOTFS=""
+            RUNNER_DETECTED=1
+            return 0
+            ;;
+    esac
+
     if command -v qemu-aarch64-static >/dev/null 2>&1; then
         log "host is $(uname -m) — using qemu-aarch64-static to execute aarch64 binaries"
-        # Copy the static binary in and exec it explicitly, the way
-        # `debootstrap --foreign` does. This deliberately avoids relying on
-        # binfmt_misc, which is unavailable in many containerised runners.
         $SUDO install -m 0755 "$(command -v qemu-aarch64-static)" \
             "$root/usr/bin/qemu-aarch64-static"
         QEMU_IN_ROOTFS="/usr/bin/qemu-aarch64-static"
+        RUNNER_DETECTED=1
         return 0
     fi
-    cat >&2 <<'EOF'
-Error: this host is not aarch64 and qemu-aarch64-static is not installed, so the
-       base package set cannot be baked into the aarch64 rootfs.
 
-       Install it with:  sudo apt-get install -y qemu-user-static
-       Or build on an arm64 runner / an Apple Silicon Mac.
+    if binfmt_handles_aarch64 "$root"; then
+        log "host is $(uname -m) — binfmt_misc handles aarch64, using a plain chroot"
+        QEMU_IN_ROOTFS=""
+        RUNNER_DETECTED=1
+        return 0
+    fi
+
+    cat >&2 <<'EOF'
+Error: this host is not aarch64, and neither qemu-aarch64-static nor a binfmt_misc
+       handler for aarch64 is available, so the base package set cannot be baked
+       into an aarch64 rootfs.
+
+       Pick whichever fits the host:
+         * GitHub Actions:  use docker/setup-qemu-action@v3 (recommended; the
+           `qemu-user-static` package no longer exists on ubuntu-26.04)
+         * Debian/Ubuntu:   sudo apt-get install -y qemu-user-static
+                            (or qemu-user-binfmt on newer releases)
+         * Build on an arm64 runner or an Apple Silicon Mac.
+
        Or pass --no-bake to produce the bare rootfs (the sandbox will then be
        missing ps/less/vi/awk/curl/wget until the agent installs them).
 EOF
     return 1
+}
+
+# The only honest test for emulation: run an aarch64 binary and see if it works.
+# /bin/true exists in every Debian image and does nothing.
+binfmt_handles_aarch64() {
+    local root="$1"
+    [ -x "$root/bin/true" ] || return 1
+    $SUDO chroot "$root" /bin/true >/dev/null 2>&1
 }
 
 chroot_exec() { # chroot_exec <root> <cmd...>
@@ -604,9 +656,11 @@ EOF
 verify_asset() {
     local root="$1"
     step "Verifying the built rootfs"
-    # Verification executes aarch64 binaries too, and with --no-bake nothing
-    # has set the runner up yet. detect_runner is idempotent.
-    if [ -z "${QEMU_IN_ROOTFS:-}" ] && [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "arm64" ]; then
+    # Verification executes aarch64 binaries too, and with --no-bake nothing has
+    # set the runner up yet. QEMU_IN_ROOTFS being empty is NOT a reliable
+    # "already detected" signal — binfmt mode legitimately leaves it empty — so
+    # track detection explicitly instead of inferring it.
+    if [ "$RUNNER_DETECTED" -eq 0 ]; then
         detect_runner "$root" || die "cannot execute aarch64 binaries on this host"
     fi
     local failures=0
