@@ -121,6 +121,22 @@ need() {
     command -v "$1" >/dev/null 2>&1 || die "$1 is required (install it first)"
 }
 
+# Human-readable size of a directory, for progress logs only.
+#
+# Two traps here, both hit in CI and neither reproducible as root locally:
+#
+#   * the tree contains root-owned 0700 directories, so an unprivileged `du`
+#     reports "Permission denied" and EXITS NON-ZERO;
+#   * while apt runs, /proc and /dev are mounted inside the rootfs, so `du`
+#     walks the HOST's procfs and trips over the same thing far more often.
+#
+# Under `set -o pipefail` either one turns a logging line into a fatal error —
+# and it fires after the expensive work is already done, so the build looks
+# like it failed for no reason. Sizing is cosmetic: never let it kill the run.
+human_size() {
+    { $SUDO du -sh "$1" 2>/dev/null || true; } | cut -f1 | head -1
+}
+
 # Pick a scratch directory that actually exists and is writable.
 #
 # Do not trust $TMPDIR. A caller can hand us one that is unusable — e.g. an
@@ -151,6 +167,17 @@ fi
 
 WORK_DIR=""
 cleanup() {
+    # Capture the real exit status FIRST, and restore it at the end.
+    #
+    # An EXIT trap must never be able to change the script's status. Without
+    # this, a `rm -rf` that cannot fully remove the staging tree (root-owned
+    # files, PRoot's link2symlink sentinels, a stale mount) reports failure, the
+    # trap's last command becomes the exit status, and a build that did all its
+    # work correctly — and printed "Assets ready" — turns into a red CI run.
+    # Observed exactly that as an unprivileged user before this guard existed.
+    local status=$?
+    set +e
+
     if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
         # Never leave a host /proc or /dev bind behind for tar to pick up.
         if mountpoint -q "$WORK_DIR/rootfs/proc" 2>/dev/null; then
@@ -159,9 +186,18 @@ cleanup() {
         if mountpoint -q "$WORK_DIR/rootfs/dev" 2>/dev/null; then
             $SUDO umount "$WORK_DIR/rootfs/dev" 2>/dev/null || true
         fi
-        [ "$KEEP_WORK" -eq 1 ] || rm -rf "$WORK_DIR"
-        [ "$KEEP_WORK" -eq 1 ] && log "work tree kept at $WORK_DIR"
+        if [ "$KEEP_WORK" -eq 1 ]; then
+            log "work tree kept at $WORK_DIR"
+        else
+            # $SUDO: the staging tree was extracted and populated as root, so an
+            # unprivileged rm cannot delete it. Best-effort either way — a
+            # leftover temp dir is not a build failure.
+            $SUDO rm -rf "$WORK_DIR" 2>/dev/null \
+                || log "warning: could not fully remove $WORK_DIR (harmless)"
+        fi
     fi
+
+    exit "$status"
 }
 trap cleanup EXIT
 
@@ -366,7 +402,7 @@ check_prerequisites() {
     # separate jobs (then merges them). Pass --require-prroto / --require-proot
     # when you want a missing binary to fail the run.
     if [ -f "$PROOT_FILE" ]; then
-        log "PRoot binary present: $PROOT_FILE ($(du -h "$PROOT_FILE" | cut -f1))"
+        log "PRoot binary present: $PROOT_FILE ($(human_size "$PROOT_FILE"))"
     elif [ "$REQUIRE_PROOT" -eq 1 ]; then
         echo "Error: $PROOT_FILE is missing (--require-proot)." >&2
         echo "       It is built from source by ./deps/build_proot.sh — run that first." >&2
@@ -406,13 +442,13 @@ unpack_rootfs() {
 
     local layer_file="$WORK_DIR/layer.tar.gz"
     fetch_layer "$LAYER_DIGEST" "$layer_file"
-    log "downloaded $(du -h "$layer_file" | cut -f1)"
+    log "downloaded $(human_size "$layer_file")"
 
     # The official debian:*-slim images are a single layer, so this is the
     # whole rootfs. Never trust the archive's ownership metadata.
     $SUDO tar -xzf "$layer_file" -C "$root" --no-same-owner
     rm -f "$layer_file"
-    log "unpacked $(du -sh "$root" | cut -f1)"
+    log "unpacked $(human_size "$root")"
 }
 
 bake_base_packages() {
@@ -450,10 +486,12 @@ bake_base_packages() {
         rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin
         rm -rf /tmp/* /var/tmp/*
     "
-    log "base packages installed ($(du -sh "$root" | cut -f1) extracted)"
-
+    # Unmount FIRST, then measure: with /proc still mounted this would walk the
+    # host's procfs, and the number would be meaningless anyway.
     $SUDO umount "$root/dev" 2>/dev/null || true
     $SUDO umount "$root/proc" 2>/dev/null || true
+
+    log "base packages installed ($(human_size "$root") extracted)"
 }
 
 # Removes the qemu shim (if any) so it never ends up in the shipped asset.
@@ -563,6 +601,19 @@ EOF
 finalize_rootfs() {
     local root="$1"
     step "Finalising (host binds need empty /dev, /proc, /sys)"
+
+    # Nothing may still be mounted here, or "empty these directories" is not
+    # even possible — an rm inside a mounted procfs does not remove the kernel's
+    # entries, and the tar step would then pack the HOST's /proc into the
+    # shipped image. bake_base_packages unmounts on its normal path; this is the
+    # belt-and-braces repeat for the paths that do not go through it.
+    for d in proc dev; do
+        if mountpoint -q "$root/$d" 2>/dev/null; then
+            log "warning: $root/$d is still mounted, unmounting"
+            $SUDO umount "$root/$d" 2>/dev/null || true
+        fi
+    done
+
     for d in dev proc sys; do
         $SUDO mkdir -p "$root/$d"
         empty_dir "$root/$d"
@@ -617,6 +668,12 @@ pack_rootfs() {
         --exclude='./.l2s.*' --exclude='.l2s.*' \
         .
 
+    # tar had to run as root (the staging tree is root-owned with 0700 dirs),
+    # so hand the artifact back to the invoking user. In CI that account is
+    # unprivileged and has to read this file to upload it as a build artifact;
+    # it must also not end up with a root-owned file in the workspace.
+    $SUDO chown "$(id -u):$(id -g)" "$ROOTFS_FILE" 2>/dev/null || true
+
     # The app's extractor only understands regular files ('-'), directories
     # ('d') and symlinks ('l'). Anything else — hardlinks ('h'), device nodes,
     # fifos, GNU/PAX long-name extension headers — is either mis-extracted or
@@ -628,7 +685,7 @@ pack_rootfs() {
         die "the archive contains entry types the app's tar parser cannot extract"
     fi
 
-    log "$ROOTFS_FILE ($(du -h "$ROOTFS_FILE" | cut -f1))"
+    log "$ROOTFS_FILE ($(human_size "$ROOTFS_FILE"))"
 }
 
 write_provenance() {
