@@ -1,7 +1,7 @@
 """Runtime dependency auto-resolution for STDIO MCP servers.
 
 When a server's `command` is something like `npx`/`uvx` that isn't installed in
-the minimal Alpine rootfs, resolve it silently (log only, never touch stdout)
+the minimal Debian rootfs, resolve it silently (log only, never touch stdout)
 so the agent's `minis-mcp-cli call` just works. Shared iOS/Android.
 """
 
@@ -38,12 +38,18 @@ def _run(cmd):
 
 
 # command-name -> install command(s) to try in order.
+# Debian 12 (bookworm): the package manager is dpkg/apt-get (no apk).
+# The two uv entries stay ordered plain-first: /etc/pip/pip.conf already sets
+# break-system-packages=true, so the plain attempt succeeds on the shipped
+# rootfs, and the --break-system-packages form is only the fallback for an
+# environment where that config (or a pip new enough to know the flag) is
+# missing.
 _RESOLVERS = {
-    "npx": ["apk add --quiet nodejs npm"],
-    "node": ["apk add --quiet nodejs npm"],
-    "npm": ["apk add --quiet nodejs npm"],
-    "python3": ["apk add --quiet python3 py3-pip"],
-    "pip": ["apk add --quiet python3 py3-pip"],
+    "npx": ["apt-get install -y -q nodejs npm"],
+    "node": ["apt-get install -y -q nodejs npm"],
+    "npm": ["apt-get install -y -q nodejs npm"],
+    "python3": ["apt-get install -y -q python3 python3-pip python3-venv"],
+    "pip": ["apt-get install -y -q python3 python3-pip python3-venv"],
     "uvx": ["pip install --quiet uv", "pip install --quiet --break-system-packages uv"],
     "uv": ["pip install --quiet uv", "pip install --quiet --break-system-packages uv"],
 }

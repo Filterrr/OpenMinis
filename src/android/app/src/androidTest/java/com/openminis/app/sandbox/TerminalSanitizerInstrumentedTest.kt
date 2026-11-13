@@ -16,13 +16,17 @@ class TerminalSanitizerInstrumentedTest {
 
     @Test
     fun sanitizeStripsAnsiFromRealTerminalOutput() {
-        // Simulate typical Alpine apk output with colors
-        val input = "\u001B[32m(1/3) Installing busybox\u001B[0m\n" +
-                "\u001B[32m(2/3) Installing musl\u001B[0m\n" +
-                "\u001B[32m(3/3) Installing alpine-base\u001B[0m"
+        // Simulate typical Debian apt-get output with colors.
+        // [map-debian] The fixture was re-pointed from the previous rootfs' apk
+        // package names to Debian ones; the ANSI sequences are byte-for-byte
+        // the same and only the payload text changed, so the assertion below
+        // still checks exact stripping of the control bytes.
+        val input = "\u001B[32m(1/3) Installing bash\u001B[0m\n" +
+                "\u001B[32m(2/3) Installing ca-certificates\u001B[0m\n" +
+                "\u001B[32m(3/3) Installing python3\u001B[0m"
         val result = TerminalSanitizer.sanitize(input)
         assertEquals(
-            "(1/3) Installing busybox\n(2/3) Installing musl\n(3/3) Installing alpine-base",
+            "(1/3) Installing bash\n(2/3) Installing ca-certificates\n(3/3) Installing python3",
             result
         )
     }

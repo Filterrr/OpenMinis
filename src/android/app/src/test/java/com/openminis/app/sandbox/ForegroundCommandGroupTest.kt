@@ -11,7 +11,7 @@ import org.junit.Test
  * [T-android-shell-timeout-pgid] Issue #358 — one command outrunning its
  * timeout wedged its whole session.
  *
- * Reported on a vivo V2301A (Android 16, PRoot Alpine): a long curl loop hit
+ * Reported on a vivo V2301A (Android 16, PRoot Debian): a long curl loop hit
  * the 180s timeout, and from then on every `shell_execute` in that session
  * timed out too — `echo alive` included — while other sessions and the
  * interactive Terminal kept working.
@@ -46,8 +46,9 @@ class ForegroundCommandGroupTest {
 
     @Test
     fun `the pgid is read from procfs, not from ps`() {
-        // busybox `ps` has no `-o pgid=`, so field 5 of /proc/self/stat is the
-        // only portable source inside this rootfs.
+        // `ps -o pgid=` is not a portable interface in this rootfs: whether the
+        // installed `ps` is procps or a minimal implementation varies with the
+        // package set, so field 5 of /proc/self/stat is the source used.
         val w = ForegroundCommandGroup.wrap("echo hi", marker)
         assertTrue(w.contains("/proc/self/stat"))
     }

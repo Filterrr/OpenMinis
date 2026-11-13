@@ -1237,7 +1237,7 @@ fun AppNavigation(
                     // their backing host dirs (filesDir/minis-global/<subdir>).
                     // Without this the browser walks the rootfs tarball
                     // directly and shows the empty placeholder dirs that ship
-                    // inside Alpine's var/minis/ — every subdir reads as
+                    // inside the Debian rootfs's var/minis/ — every subdir reads as
                     // "Empty folder" even though the agent has files there.
                     linuxRootPath = "/",
                     // T147: scope per-session subdirs (attachments / workspace

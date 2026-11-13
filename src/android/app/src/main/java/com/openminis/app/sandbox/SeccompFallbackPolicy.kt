@@ -8,23 +8,25 @@ package com.openminis.app.sandbox
  * ## Why this exists
  *
  * GH#186: on one reporter's ARM64 device, `/bin/true` and `uname` run fine
- * inside the Alpine rootfs but `apk --version` dies instantly with SIGBUS and
- * `apk update` with SIGSEGV. We could not reproduce it: on a Pixel 6 the very
- * same bytes (rootfs binaries verified byte-identical to the shipped tarball)
- * with the very same argv run `apk update` to completion. So the fault is not
- * in what we ship — it is in how the host kernel handles proot's
+ * inside the Debian rootfs but `apt-get --version` dies instantly with SIGBUS
+ * and `apt-get update` with SIGSEGV. We could not reproduce it: on a Pixel 6
+ * the very same bytes (rootfs binaries verified byte-identical to the shipped
+ * tarball) with the very same argv run `apt-get update` to completion. So the
+ * fault is not in what we ship — it is in how the host kernel handles proot's
  * ptrace+seccomp interaction, which is exactly the class of bug proot itself
  * documents a workaround for: `PROOT_NO_SECCOMP=1` (see
  * deps/proot/src/tracee/event.c:97 and deps/proot/src/cli/cli.c:140, and
  * upstream's "Add PR_epoll_wait SIGSYS handler" for a kernel that mis-fires the
  * same way).
  *
- * The symptom distribution is the tell: `apk` is the **only dynamically linked
- * program** in the minirootfs — `/bin/true` and `uname` are busybox symlinks.
- * That points at the dynamic-loading/mmap path under ptrace, not at file
- * content, and it means any dynamically linked guest binary can be hit, not
- * just apk. Hence this is applied at the sandbox launch layer rather than
- * special-cased for apk.
+ * The symptom distribution is the tell: `apt-get` and `dpkg` are dynamically
+ * linked glibc programs — the same class of binary as everything else in a
+ * Debian rootfs once you leave the dash builtins — and they are what the
+ * reporter ran. That points at the dynamic-loading/mmap path under ptrace, not
+ * at file content, and it means any dynamically linked guest binary can be hit,
+ * not just apt-get/dpkg. Hence the retry policy below is kept unchanged, and it
+ * is applied at the sandbox launch layer rather than special-cased for one
+ * program.
  *
  * ## Why gate on "early" rather than retrying every signal death
  *
@@ -50,7 +52,7 @@ object SeccompFallbackPolicy {
 
     /**
      * Upper bound on "died during startup". Generous on purpose: a cold
-     * dynamic link of apk pulling in libcrypto/libssl on a slow device is
+     * dynamic link of apt-get pulling in libcrypto/libssl on a slow device is
      * still far under a second, while any program that ran long enough to do
      * real work is well past it. Raising this trades safety (re-running a
      * command that had side effects) for coverage, so it stays conservative.
@@ -60,8 +62,8 @@ object SeccompFallbackPolicy {
     /**
      * Shell/waitpid convention: a process killed by signal N reports 128+N.
      *
-     * - 135 = 128+7  SIGBUS  — the reported `apk --version` failure
-     * - 139 = 128+11 SIGSEGV — the reported `apk update` / `apk add` failure
+     * - 135 = 128+7  SIGBUS  — the reported `apt-get --version` failure
+     * - 139 = 128+11 SIGSEGV — the reported `apt-get update` / `apt-get install` failure
      * - 132 = 128+4  SIGILL  — same family: a mis-mapped/mis-restarted text
      *   segment lands on garbage instructions just as easily as on a bad
      *   address, so it is treated identically.

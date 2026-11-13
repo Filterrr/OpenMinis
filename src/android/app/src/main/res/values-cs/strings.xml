@@ -306,7 +306,7 @@
     <string name="settings_env_vars">Proměnné prostředí</string>
     <string name="settings_env_vars_subtitle">Proměnné vkládané do sandboxu</string>
     <string name="settings_section_storage">Úložiště</string>
-    <string name="settings_storage_subtitle">Správa rootfs Alpine Linux a procházení souborů</string>
+    <string name="settings_storage_subtitle">Správa rootfs Debian Linux a procházení souborů</string>
     <string name="settings_section_permissions">Oprávnění</string>
     <string name="settings_permissions_subtitle">Řízení přístupu agenta k funkcím citlivým na soukromí</string>
     <string name="settings_section_logs">Protokoly</string>
@@ -1012,7 +1012,7 @@
     <string name="rootfs_result_section">Výsledek</string>
     <string name="rootfs_info_section">Informace</string>
     <string name="rootfs_about_title">O rootfs</string>
-    <string name="rootfs_about_description">Rootfs obsahuje souborový systém Alpine Linux používaný sandboxem. Resetováním se smažou všechna data a obnoví se tovární stav.</string>
+    <string name="rootfs_about_description">Rootfs obsahuje souborový systém Debian Linux používaný sandboxem. Resetováním se smažou všechna data a obnoví se tovární stav.</string>
     <string name="rootfs_about_operations">Reset: Smazat vše | Záloha: Uložit adresář /root | Obnovení: Obnovit uložená data</string>
     <string name="rootfs_reset_confirm_title">Resetovat rootfs?</string>
     <string name="rootfs_reset_confirm_message">Tímto se smaže celý rootfs. Všechna data budou ztracena.</string>

@@ -304,7 +304,7 @@
     <string name="settings_env_vars">Környezeti változók</string>
     <string name="settings_env_vars_subtitle">A sandboxba beillesztett változók</string>
     <string name="settings_section_storage">Tárhely</string>
-    <string name="settings_storage_subtitle">Alpine Linux rootfs kezelése és fájlok böngészése</string>
+    <string name="settings_storage_subtitle">Debian Linux rootfs kezelése és fájlok böngészése</string>
     <string name="settings_section_permissions">Engedélyek</string>
     <string name="settings_permissions_subtitle">Az ügynök hozzáférése az adatvédelmi szempontból érzékeny funkciókhoz</string>
     <string name="settings_section_logs">Naplók</string>
@@ -1004,7 +1004,7 @@
     <string name="rootfs_result_section">Eredmény</string>
     <string name="rootfs_info_section">Információ</string>
     <string name="rootfs_about_title">A rootfs-ről</string>
-    <string name="rootfs_about_description">A rootfs a sandbox által használt Alpine Linux fájlrendszert tartalmazza. Az alaphelyzetbe állítás minden adatot töröl, és visszaállítja a gyári állapotot.</string>
+    <string name="rootfs_about_description">A rootfs a sandbox által használt Debian Linux fájlrendszert tartalmazza. Az alaphelyzetbe állítás minden adatot töröl, és visszaállítja a gyári állapotot.</string>
     <string name="rootfs_about_operations">Alaphelyzet: minden törlése | Biztonsági mentés: a /root könyvtár mentése | Visszaállítás: a mentett adatok helyreállítása</string>
     <string name="rootfs_reset_confirm_title">Visszaállítod a rootfs-t?</string>
     <string name="rootfs_reset_confirm_message">Ez a teljes rootfs-t törli. Minden adat elvész.</string>

@@ -24,12 +24,12 @@ class SeccompFallbackPolicyTest {
     // ---- the reported signature ------------------------------------------
 
     @Test
-    fun `early SIGBUS with no output retries — the reported apk --version failure`() {
+    fun `early SIGBUS with no output retries — the reported apt --version failure`() {
         assertTrue(decide(exit = 135, ms = 40))
     }
 
     @Test
-    fun `early SIGSEGV with no output retries — the reported apk update failure`() {
+    fun `early SIGSEGV with no output retries — the reported apt-get update failure`() {
         assertTrue(decide(exit = 139, ms = 80))
     }
 

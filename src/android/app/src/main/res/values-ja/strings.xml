@@ -292,7 +292,7 @@
     <string name="settings_env_vars">環境変数</string>
     <string name="settings_env_vars_subtitle">サンドボックスに注入される変数</string>
     <string name="settings_section_storage">ストレージ</string>
-    <string name="settings_storage_subtitle">Alpine Linux rootfs を管理してファイルを参照</string>
+    <string name="settings_storage_subtitle">Debian Linux rootfs を管理してファイルを参照</string>
     <string name="settings_section_permissions">権限</string>
     <string name="settings_permissions_subtitle">プライバシーに関わる機能への Agent のアクセスを制御</string>
     <string name="settings_section_logs">ログ</string>
@@ -962,7 +962,7 @@
     <string name="rootfs_result_section">結果</string>
     <string name="rootfs_info_section">情報</string>
     <string name="rootfs_about_title">Rootfsについて</string>
-    <string name="rootfs_about_description">rootfs にはサンドボックスが使用する Alpine Linux ファイルシステムが含まれます。リセットするとすべてのデータが削除され、初期状態に戻ります。</string>
+    <string name="rootfs_about_description">rootfs にはサンドボックスが使用する Debian Linux ファイルシステムが含まれます。リセットするとすべてのデータが削除され、初期状態に戻ります。</string>
     <string name="rootfs_about_operations">リセット：すべて削除 | バックアップ：/root を保存 | 復元：保存したデータを復元</string>
     <string name="rootfs_reset_confirm_title">Rootfsをリセットしますか？</string>
     <string name="rootfs_reset_confirm_message">rootfs 全体を削除します。すべてのデータが失われます。</string>

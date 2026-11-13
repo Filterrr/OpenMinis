@@ -17,7 +17,7 @@ class SystemPromptJavaLineTest {
 
     @Test
     fun `the JDK line follows the Python note once and mentions no JAVA_TOOL_OPTIONS`() {
-        val line = "- Java: install a JDK with `apk add openjdk21-jdk` (openjdk17-jdk / openjdk11-jdk / openjdk8 for older projects). " +
+        val line = "- Java: install a JDK with `apt-get install -y openjdk-17-jdk` (bookworm's default; an older project may need `openjdk-11-jdk`). " +
             "JDK 8's javac needs the `-d` output directory to exist.\n"
         assertEquals(1, vm.split(line).size - 1)
         val python = vm.indexOf("- Python packages: many PyPI packages")

@@ -2,21 +2,23 @@
 # Loaded by /etc/profile via the profile.d mechanism (login shells only).
 
 # Prompt parity with iOS — `root@minis:/var/minis#`. iOS bakes the
-# literal "minis" into PS1 (deps/prepare_alpine_rootfs.sh) rather than
+# literal "minis" into PS1 when it prepares its rootfs rather than
 # relying on \h, so the prompt is stable regardless of what /etc/hostname
-# happens to contain. We do the same on Android so a fresh install
-# matches without needing a rootfs rebuild.
+# happens to contain. The Android rootfs is provisioned by
+# scripts/prepare_android_sandbox.sh and we do the same here, so a fresh
+# install matches without needing a rootfs rebuild.
 export PS1='\u@minis:\w\$ '
 
-# Enable ash command history with arrow keys
-export HISTFILE="$HOME/.ash_history"
+# Enable bash command history with arrow keys
+export HISTFILE="$HOME/.bash_history"
 export HISTSIZE=1000
 
-# Point ENV to .ashrc so interactive ash picks up line-editing config
-export ENV="$HOME/.ashrc"
+# Point BASH_ENV to .bashrc so non-interactive bash picks up the line-editing
+# config (interactive bash reads ~/.bashrc directly).
+export BASH_ENV="$HOME/.bashrc"
 
-# Default pager — less is standard on Alpine; keep explicit for scripts
-# that probe $PAGER.
+# Default pager — less is a real installed package on Debian; keep explicit for
+# scripts that probe $PAGER.
 export PAGER=less
 
 # URL interception: $BROWSER is also seeded directly into every process

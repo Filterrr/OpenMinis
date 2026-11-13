@@ -34,13 +34,27 @@ sealed class RootfsInstallState {
 }
 
 /**
- * Manages Alpine Linux rootfs installation and PRoot binary extraction.
+ * Manages the Debian Linux rootfs installation and PRoot binary extraction.
  * Corresponds to iOS RootfsManager.swift.
+ *
+ * The guest is Debian 12 "bookworm" (glibc, apt), not Alpine: the rootfs ships
+ * as `debian-rootfs.tar.gz`, built by `scripts/prepare_android_sandbox.sh` from
+ * the official `library/debian:bookworm-slim` arm64 layer with a base package
+ * set baked in (see that script for the exact set and why). iOS is unaffected
+ * and still boots an Alpine minirootfs through iSH.
  */
 class RootfsManager private constructor(private val context: Context) {
 
-    val rootfsDir: File = File(context.filesDir, "alpine-rootfs")
+    val rootfsDir: File = File(context.filesDir, "debian-rootfs")
     val prootBinary: File = File(context.applicationInfo.nativeLibraryDir, "libproot.so")
+
+    /**
+     * Rootfs directory used by builds that shipped Alpine. A user upgrading
+     * across the switch still has a complete `alpine-rootfs/` tree (8 MB,
+     * with its own `.arch` marker) sitting in filesDir; nothing reads it any
+     * more, so it is deleted once the Debian rootfs is in place.
+     */
+    private val legacyRootfsDir: File = File(context.filesDir, "alpine-rootfs")
 
     private val archFile: File get() = File(rootfsDir, ".arch")
 
@@ -60,21 +74,24 @@ class RootfsManager private constructor(private val context: Context) {
     val installState: StateFlow<RootfsInstallState> = _installState.asStateFlow()
 
     /**
-     * Install Alpine rootfs from assets if not already present.
-     * Extracts alpine-minirootfs.tar.gz using manual POSIX tar parsing.
+     * Install the Debian rootfs from assets if not already present.
+     * Extracts debian-rootfs.tar.gz using manual POSIX tar parsing.
      * Progress is published to [installState] (Preparing → Extracting(f) →
      * Finalizing → Installed / Failed).
      */
     suspend fun installIfNeeded() = withContext(Dispatchers.IO) {
         if (isInstalled) {
             Log.d(TAG, "Rootfs already installed at $rootfsDir")
+            // Cheap while-loop: only walks filesDir once, and only ever after
+            // an upgrade that happened to leave the Alpine tree behind.
+            discardLegacyRootfs()
             _installState.value = RootfsInstallState.Installed
             return@withContext
         }
 
         try {
             _installState.value = RootfsInstallState.Preparing
-            Log.i(TAG, "Installing Alpine rootfs...")
+            Log.i(TAG, "Installing Debian rootfs...")
 
             // Clean up any partial install
             if (rootfsDir.exists()) {
@@ -133,12 +150,17 @@ class RootfsManager private constructor(private val context: Context) {
                 File(rootfsDir, "var/minis/$subdir").mkdirs()
             }
 
-            // Pre-create /opt/bin — appears in PATH so users can drop third-party
-            // binaries here without first `mkdir -p`. Matches iOS PATH layout.
+            // Pre-create /opt/bin — kept in the guest PATH so users can drop
+            // third-party binaries here without first `mkdir -p`. Matches the
+            // iOS PATH layout. (Debian itself has no /opt/bin; nothing else
+            // lives there.)
             File(rootfsDir, "opt/bin").mkdirs()
 
             // Write resolv.conf from system DNS (fallback to 8.8.8.8)
             refreshDns()
+
+            // Alpine is gone; reclaim its tree on upgrade installs.
+            discardLegacyRootfs()
 
             // Flag a fresh install so MirrorSpeedTestViewModel.autoDetectOnceIfNeeded()
             // picks the fastest mirror for each category on first boot.
@@ -153,6 +175,24 @@ class RootfsManager private constructor(private val context: Context) {
             Log.e(TAG, "Rootfs installation failed", t)
             _installState.value = RootfsInstallState.Failed(t.message ?: t.javaClass.simpleName)
             throw t
+        }
+    }
+
+    /**
+     * Delete the superseded `alpine-rootfs/` tree, if a previous build of the
+     * app created one. Idempotent and safe to call on every launch: it does
+     * nothing once the directory is gone.
+     *
+     * Deliberately best-effort. A failed delete is a stale 8 MB directory, not
+     * a broken sandbox, and it must never turn into a startup failure.
+     */
+    private fun discardLegacyRootfs() {
+        if (!legacyRootfsDir.exists()) return
+        val removed = legacyRootfsDir.deleteRecursively()
+        if (removed) {
+            Log.i(TAG, "Removed legacy Alpine rootfs at $legacyRootfsDir")
+        } else {
+            Log.w(TAG, "Could not remove legacy Alpine rootfs at $legacyRootfsDir")
         }
     }
 
@@ -262,7 +302,7 @@ class RootfsManager private constructor(private val context: Context) {
 
     /**
      * Read system DNS servers and search domains from ConnectivityManager,
-     * then write resolv.conf into the Alpine rootfs.
+     * then write resolv.conf into the Debian rootfs.
      * Mirrors iOS ISHKernel.configureDns / refreshDns.
      * Falls back to 8.8.8.8 / 8.8.4.4 if no system DNS available.
      */
@@ -376,10 +416,17 @@ class RootfsManager private constructor(private val context: Context) {
             return@withContext
         }
 
-        // Mirror iOS removeExternallyManagedMarker() — drop PEP 668 marker so
-        // `pip install` Just Works inside this embedded Alpine rootfs even
-        // when the shipped pip.conf isn't being read (e.g. pip invoked with
-        // --isolated or via a venv). Safe: this is a single-tenant sandbox.
+        // Mirror iOS removeExternallyManagedMarker() — drop the PEP 668 marker
+        // so `pip install` Just Works inside this single-tenant sandbox.
+        //
+        // On Alpine there was nothing to remove and this was purely
+        // preventative. On Debian the marker is a real obstacle: python3 is
+        // NOT part of the shipped image, so on a cold install this runs before
+        // the interpreter exists and does nothing. Whatever installs python3
+        // later (apt via minis-mcp-cli / deps.py) brings the marker with it,
+        // and from that point on the shipped /etc/pip/pip.conf — overlaid on
+        // every boot by this same method — is what keeps `pip install`
+        // working, with `--break-system-packages` as the wrapper's fallback.
         val markerRemoved = removeExternallyManagedMarker()
 
         // [T-mcp-cli-readonly-android] Make the shipped minis-mcp-cli Python lib
@@ -749,8 +796,8 @@ class RootfsManager private constructor(private val context: Context) {
             return sb.toString().trim()
         }
         private const val ARCH = "aarch64"
-        private const val ROOTFS_ASSET = "alpine-minirootfs.tar.gz"
-        private const val ROOTFS_ASSET_TAR = "alpine-minirootfs.tar"
+        private const val ROOTFS_ASSET = "debian-rootfs.tar.gz"
+        private const val ROOTFS_ASSET_TAR = "debian-rootfs.tar"
         private const val PROOT_ASSET = "proot-aarch64"
         private const val DEFAULT_MOUNT_ASSET = "default_mount"
 

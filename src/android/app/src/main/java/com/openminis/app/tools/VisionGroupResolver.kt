@@ -131,7 +131,7 @@ object VisionGroupResolver {
      * a bare "[Image attached but this model does not support vision input]".
      * That was a dead end built on a false premise — that without a Vision
      * Group there is no recourse. There is: `shell_execute` is exposed
-     * unconditionally (AgentTools) and runs in the SAME PRoot Alpine sandbox
+     * unconditionally (AgentTools) and runs in the SAME PRoot Debian sandbox
      * the image was written to, so a model holding the path can run `file`,
      * `identify`, `exiftool`, Pillow, an OCR pass, a checksum — none of which
      * need a Vision Group, and none of which it can even attempt without the

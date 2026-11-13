@@ -447,7 +447,7 @@ class TerminalSession(private val context: Context) {
         cmd.add(rootfsManager.prootBinary.absolutePath)
         cmd.add("-0")
         // T141: see PRootKernel.buildProotCommand for rationale — translates
-        // hardlinks to symlinks so apk install of binutils/gcc works.
+        // hardlinks to symlinks so apt-get install of binutils/gcc works.
         cmd.add("--link2symlink")
         cmd.add("-r"); cmd.add(rootfsManager.rootfsDir.absolutePath)
         cmd.add("-b"); cmd.add("/dev")

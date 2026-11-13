@@ -330,7 +330,7 @@
     <string name="settings_env_vars">Varijable okoline</string>
     <string name="settings_env_vars_subtitle">Varijable umetnute u sandbox</string>
     <string name="settings_section_storage">Pohrana</string>
-    <string name="settings_storage_subtitle">Upravljajte Alpine Linux rootfs-om i pregledavajte datoteke</string>
+    <string name="settings_storage_subtitle">Upravljajte Debian Linux rootfs-om i pregledavajte datoteke</string>
     <string name="settings_section_permissions">Dopuštenja</string>
     <string name="settings_permissions_subtitle">Upravljajte pristupom Agenta značajkama osjetljivima na privatnost</string>
     <string name="settings_section_logs">Zapisi</string>
@@ -1045,7 +1045,7 @@
     <string name="rootfs_result_section">Rezultat</string>
     <string name="rootfs_info_section">Informacije</string>
     <string name="rootfs_about_title">O rootfs-u</string>
-    <string name="rootfs_about_description">Rootfs sadrži Alpine Linux datotečni sustav koji koristi pješčanik. Poništavanje će izbrisati sve podatke i vratiti tvorničko stanje.</string>
+    <string name="rootfs_about_description">Rootfs sadrži Debian Linux datotečni sustav koji koristi pješčanik. Poništavanje će izbrisati sve podatke i vratiti tvorničko stanje.</string>
     <string name="rootfs_about_operations">Poništi: izbriši sve | Sigurnosna kopija: spremi mapu /root | Vrati: oporavi spremljene podatke</string>
     <string name="rootfs_reset_confirm_title">Poništiti rootfs?</string>
     <string name="rootfs_reset_confirm_message">Ovo će izbrisati cijeli rootfs. Svi podaci bit će izgubljeni.</string>

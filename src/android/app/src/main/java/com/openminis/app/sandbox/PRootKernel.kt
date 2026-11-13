@@ -104,7 +104,7 @@ object PRootKernel {
         // caller walk straight past it while the first was still suspended
         // inside installIfNeeded(). Both then raced on, and whoever spawned a
         // shell first did it with nativeLibDir/prootLoaderPath still empty —
-        // proot then bare-execve'd the rootfs busybox and SELinux killed it
+        // proot then bare-execve'd the rootfs /bin/sh and SELinux killed it
         // with `execve("/bin/sh"): Permission denied`.
         bootMutex.withLock {
             // Re-check under the lock: the caller we queued behind may have
@@ -151,7 +151,10 @@ object PRootKernel {
         if (loaderPath.exists()) prootLoaderPath = loaderPath.absolutePath
         if (loader32Path.exists()) prootLoader32Path = loader32Path.absolutePath
 
-        // Set default PATH for Alpine Linux
+        // Set default PATH for the Debian guest. /opt/bin is not a Debian
+        // directory — RootfsManager pre-creates it in the rootfs and we keep it
+        // on PATH so a user can drop third-party binaries there without first
+        // `mkdir -p`, matching the iOS PATH layout.
         customEnvironment.putIfAbsent("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin")
         customEnvironment.putIfAbsent("HOME", "/root")
 
@@ -161,11 +164,15 @@ object PRootKernel {
         // Mirrors iOS ISHShellExecutor.m:333.
         customEnvironment["BROWSER"] = "/usr/local/bin/minis-open"   // T195: force override; user dotfile BROWSER= would otherwise win
 
-        // ash-specific: ENV points at a file the shell sources on startup.
-        // Our /etc/profile sources /etc/profile.d/*.sh, so non-login shells
-        // (PersistentShell uses plain `/bin/sh`) still pick up HISTFILE,
-        // aliases, and the rest of the shipped profile. Mirrors iOS
-        // ISHShellExecutor.m:326.
+        // Points at the file an interactive shell sources on startup. Both
+        // shells this guest can run honour it — dash (the Debian /bin/sh) and
+        // bash — so a user who starts one by hand picks up HISTFILE, the
+        // shipped aliases and the rest. Our /etc/profile sources
+        // /etc/profile.d/*.sh. Mirrors iOS ISHShellExecutor.m:326.
+        //
+        // Note this deliberately covers INTERACTIVE shells only: a
+        // non-interactive `sh -c` ignores $ENV, which is the behaviour the
+        // shell_execute path wants (no profile side effects per command).
         customEnvironment.putIfAbsent("ENV", "/etc/profile")
 
         // Character-set declaration for tools that probe $CHARSET instead of
@@ -210,11 +217,12 @@ object PRootKernel {
             customEnvironment.putIfAbsent("GIT_CONFIG_VALUE_0", "rename")
         }
 
-        // Inject device timezone so Alpine userspace sees local time.
+        // Inject device timezone so the guest sees local time.
         // Mirrors iOS ISHShellExecutor.m:335-353 — uses POSIX TZ format with a
-        // fixed name ("LCL") to avoid abbreviations like "GMT+8" which contain
-        // +/- and confuse musl's TZ parser. POSIX sign is reversed from UTC
-        // offset (UTC+8 → "LCL-8"), matching iOS exactly.
+        // fixed name ("LCL"). The fixed name exists for iOS parity: iSH's libc
+        // (musl) mis-parses abbreviations with an embedded sign, so the shared
+        // value avoids them. glibc accepts the same string, and POSIX sign is
+        // reversed from the UTC offset (UTC+8 → "LCL-8") on both.
         customEnvironment["TZ"] = posixTz()
 
         // Propagate the Android system HTTP proxy into every sandboxed
@@ -305,7 +313,7 @@ object PRootKernel {
     private const val MOUNTS_LINUX_PREFIX = "/var/minis/mounts/"
 
     // Sentinel in the read-only write-guard wrapper scripts so we can recognize
-    // and remove our own wrappers (vs a user/busybox binary of the same name).
+    // and remove our own wrappers (vs a real binary of the same name).
     private const val GUARD_MARKER = "minis-mount-readonly-guard"
 
     /**
@@ -582,9 +590,10 @@ object PRootKernel {
      *   UTC+5:30 → "LCL-5:30"
      *   UTC-3:00 → "LCL+3"
      *
-     * POSIX TZ sign is inverted relative to UTC offset, and we use the fixed
-     * name "LCL" to avoid musl's confused parsing of abbreviations like
-     * "GMT+8" (which contain an embedded sign).
+     * POSIX TZ sign is inverted relative to UTC offset, and we use a fixed
+     * name "LCL" for iOS parity (musl's parser chokes on abbreviations with an
+     * embedded sign, and the value is shared with the iSH side). glibc reads
+     * it identically.
      */
     fun posixTz(): String {
         val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
@@ -698,11 +707,17 @@ object PRootKernel {
         // T141: Translate hardlink() syscalls to symlink(). Android's /data
         // (ext4/F2FS as mounted by zygote) refuses cross-directory hardlinks
         // for app uids, so PRoot would otherwise pass link() straight through
-        // to the host kernel and the host kernel rejects with EPERM. Alpine's
-        // apk installs busybox-applet packages (binutils, gcc deps, etc.) by
-        // hardlinking ar/ld/nm/strip → busybox; without this flag every such
-        // install fails with "Permission denied". Symlinks are functionally
-        // equivalent for the apk consumer.
+        // to the host kernel and the host kernel rejects with EPERM. Debian
+        // installs plenty of hardlinks (gunzip → gzip, unzip → zipinfo,
+        // perl5.36.0 → perl, update-alternatives-managed tools); without this
+        // flag every such install or `apt-get upgrade` fails with "Permission
+        // denied". Symlinks are functionally equivalent for the consumer.
+        //
+        // Note this is also why `scripts/prepare_android_sandbox.sh` packs the
+        // asset with --hard-dereference: the app's own tar parser copies a
+        // hardlink target only when it has already been extracted, so shipping
+        // type-'1' entries would depend on tar's ordering to install a working
+        // /usr/bin.
         cmd.add("--link2symlink")
 
         // Set rootfs
@@ -880,28 +895,32 @@ object PRootKernel {
 
     /**
      * Install /usr/local/bin/ wrapper scripts that work around Android-specific
-     * sandbox limitations. These take precedence over /bin/busybox in PATH.
+     * sandbox limitations. /usr/local/bin precedes /usr/bin in the guest PATH,
+     * so these shadow the real binaries.
      *
      * top: Android's hidepid=2 + SELinux blocks reads of /proc/<other_pid>/stat
      * for non-system UIDs, so plain `top` fails with "can't open 'stat': Permission
      * denied". Restrict it transparently to the PIDs we can actually read.
      *
+     * Also worth knowing: procps on Debian reads /proc/uptime, so with no
+     * readable /proc the real top dies outright — the wrapper at least prints
+     * the PIDs it can see.
+     *
      * Always rewritten so improvements ship with each app update.
      */
     private fun installShellWrappers(binDir: File) {
-        // busybox `top` walks all of /proc and aborts on the first unreadable
-        // /proc/<pid>/stat (Android sandbox blocks reads of other UIDs' procfs).
-        // busybox in this rootfs doesn't accept `-p PIDS` either. Workaround:
-        // simulate `top` with `ps` in a refresh loop, scoped to our session
-        // (only PIDs whose /proc/<pid>/stat is actually readable by us).
+        // Real `top` (procps) walks all of /proc and aborts on the first
+        // unreadable /proc/<pid>/stat (Android blocks reads of other UIDs'
+        // procfs). Workaround: simulate `top` with `ps` in a refresh loop,
+        // scoped to our session (only PIDs whose /proc/<pid>/stat is actually
+        // readable by us).
         val topWrapper = File(binDir, "top")
         topWrapper.writeText(
             """#!/bin/sh
             |# Auto-installed by MinisApp PRootKernel.
-            |# busybox top walks all of /proc and aborts on the first unreadable
-            |# entry under Android's procfs hidepid restrictions, and this build
-            |# of busybox doesn't accept `-p`. Emulate `top` with `ps` over the
-            |# PIDs we can actually inspect.
+            |# procps `top` walks all of /proc and aborts on the first unreadable
+            |# entry under Android's procfs hidepid restrictions. Emulate it with
+            |# `ps` over the PIDs we can actually inspect.
             |
             |# Parse a few common top-style flags so existing muscle memory works.
             |delay=2
@@ -946,7 +965,7 @@ object PRootKernel {
             |    visible=${'$'}(echo "${'$'}pids" | tr ',' '\n' | wc -l)
             |    printf 'top — up %dd %02d:%02d  visible processes: %d (own session only)\n' "${'$'}days" "${'$'}hours" "${'$'}mins" "${'$'}visible"
             |    printf '%s\n' '  PID USER     STAT  RSS  PPID COMMAND'
-            |    /bin/busybox ps -o pid,user,stat,rss,ppid,comm 2>/dev/null \
+            |    /usr/bin/ps -o pid,user,stat,rss,ppid,comm 2>/dev/null \
             |        | awk -v pids=",${'$'}pids," 'NR==1 {next} {if (index(pids,","${'$'}1",")) print "  " ${'$'}0}'
             |}
             |
@@ -1020,8 +1039,8 @@ object PRootKernel {
         val configFile = File(rootfs, "var/minis/.mount-readonly-prefixes")
 
         if (readOnlyLinuxPrefixes.isEmpty()) {
-            // No read-only mounts — remove the config + wrappers so plain busybox
-            // commands run unimpeded.
+            // No read-only mounts — remove the config + wrappers so the real
+            // coreutils commands run unimpeded.
             runCatching { configFile.delete() }
             for (name in guardedCmds) {
                 val w = File(binDir, name)
@@ -1056,7 +1075,7 @@ object PRootKernel {
                 |        done < "${'$'}cfg"
                 |    done
                 |fi
-                |exec /bin/busybox $name "${'$'}@"
+                |exec /usr/bin/$name "${'$'}@"
                 |""".trimMargin(),
             )
             wrapper.setExecutable(true, false)

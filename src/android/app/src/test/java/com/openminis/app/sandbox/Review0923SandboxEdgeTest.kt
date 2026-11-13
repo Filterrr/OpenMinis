@@ -17,7 +17,7 @@ import org.junit.Test
  *  - 71e813d03 (TerminalSanitizer.foldCarriageReturns real-overwrite semantics):
  *    the overwrite runs BEFORE escape stripping, so escape bytes are counted as
  *    screen columns. Two ordinary shapes come out garbled: `\r\e[K` (erase line,
- *    used by pip / npm / apk / git progress) and a coloured segment overwritten
+ *    used by pip / npm / apt / git progress) and a coloured segment overwritten
  *    by a plain one.
  *  - 567a47480 / c4414dc11 (FreshProcessShell is the default): the fresh path
  *    must keep the warm path's GH#186 seccomp self-heal, and must decode UTF-8

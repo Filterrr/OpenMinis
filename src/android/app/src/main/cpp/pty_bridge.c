@@ -271,7 +271,8 @@ Java_com_openminis_app_sandbox_PtyBridge_waitFor(
 // every app thread (Runtime::BlockSignals), and ProcessBuilder's child keeps
 // the caller's signal mask across execve. Agent shells spawned that way ran
 // with SIGPIPE blocked, so a writer whose reader had exited got EPIPE instead
-// of dying: busybox `yes foobar | head -c 50000` then spins forever and the
+// of dying: `yes foobar | head -c 50000` (coreutils `yes` on Debian) then
+// spins forever and the
 // tool call hangs until its timeout. forkExec above clears the mask in its
 // own child; ProcessBuilder offers no such hook, so the caller unblocks
 // SIGPIPE on the spawning thread around start() and restores it afterwards.

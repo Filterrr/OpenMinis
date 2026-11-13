@@ -304,7 +304,7 @@
     <string name="settings_env_vars">متغیرهای محیطی</string>
     <string name="settings_env_vars_subtitle">متغیرهایی که به محیط ایزوله تزریق می‌شوند</string>
     <string name="settings_section_storage">فضای ذخیره‌سازی</string>
-    <string name="settings_storage_subtitle">مدیریت rootfs مربوط به Alpine Linux و مرور فایل‌ها</string>
+    <string name="settings_storage_subtitle">مدیریت rootfs مربوط به Debian Linux و مرور فایل‌ها</string>
     <string name="settings_section_permissions">مجوزها</string>
     <string name="settings_permissions_subtitle">کنترل دسترسی عامل به قابلیت‌های حساس از نظر حریم خصوصی</string>
     <string name="settings_section_logs">گزارش‌ها</string>
@@ -1004,7 +1004,7 @@
     <string name="rootfs_result_section">نتیجه</string>
     <string name="rootfs_info_section">اطلاعات</string>
     <string name="rootfs_about_title">دربارهٔ rootfs</string>
-    <string name="rootfs_about_description">\u200Frootfs شامل سیستم فایل Alpine Linux است که محیط ایزوله از آن استفاده می‌کند. بازنشانی همهٔ داده‌ها را حذف می‌کند و آن را به وضعیت کارخانه برمی‌گرداند.</string>
+    <string name="rootfs_about_description">\u200Frootfs شامل سیستم فایل Debian Linux است که محیط ایزوله از آن استفاده می‌کند. بازنشانی همهٔ داده‌ها را حذف می‌کند و آن را به وضعیت کارخانه برمی‌گرداند.</string>
     <string name="rootfs_about_operations">بازنشانی: حذف همه‌چیز | پشتیبان‌گیری: ذخیرهٔ پوشهٔ /root | بازیابی: بازگرداندن داده‌های ذخیره‌شده</string>
     <string name="rootfs_reset_confirm_title">\u200Frootfs بازنشانی شود؟</string>
     <string name="rootfs_reset_confirm_message">کل rootfs حذف خواهد شد. همهٔ داده‌ها از بین می‌روند.</string>

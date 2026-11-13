@@ -8,13 +8,13 @@ import android.util.Log
  * ART blocks SIGPIPE in every app thread (Runtime::BlockSignals), and
  * ProcessBuilder's child keeps the spawning thread's signal mask across
  * execve, through proot, into every guest process. Nothing on the way unblocks
- * it (busybox sh does not), so a writer whose reader had exited got EPIPE
- * instead of being killed. Most tools then exit on the error, but busybox
+ * it (dash does not), so a writer whose reader had exited got EPIPE
+ * instead of being killed. Most tools then exit on the error, but coreutils
  * `yes STRING | head -c N` never notices it and spins forever: head exits,
  * yes keeps holding the merged stderr pipe open, and the shell_execute call
  * hangs until its timeout (15 min by default). Seen on a Pixel 4a as
- * "yes ... | head -c 50000 stuck for 6+ minutes"; reproduced on stock
- * Alpine 3.21 busybox by blocking SIGPIPE in the parent.
+ * "yes ... | head -c 50000 stuck for 6+ minutes"; reproduced on a stock
+ * Debian 12 guest by blocking SIGPIPE in the parent.
  *
  * The interactive terminal never had this problem: PtyBridge.forkExec clears
  * the mask in its own child. ProcessBuilder offers no such hook, so the mask

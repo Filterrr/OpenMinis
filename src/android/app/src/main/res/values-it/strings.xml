@@ -305,7 +305,7 @@
     <string name="settings_env_vars">Variabili d\'ambiente</string>
     <string name="settings_env_vars_subtitle">Variabili inserite nella sandbox</string>
     <string name="settings_section_storage">Spazio di archiviazione</string>
-    <string name="settings_storage_subtitle">Gestisci il rootfs di Alpine Linux e sfoglia i file</string>
+    <string name="settings_storage_subtitle">Gestisci il rootfs di Debian Linux e sfoglia i file</string>
     <string name="settings_section_permissions">Autorizzazioni</string>
     <string name="settings_permissions_subtitle">Controlla l\'accesso dell\'agente alle funzioni sensibili per la privacy</string>
     <string name="settings_section_logs">Log</string>
@@ -1008,7 +1008,7 @@
     <string name="rootfs_result_section">Risultato</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">Informazioni su Rootfs</string>
-    <string name="rootfs_about_description">Il rootfs contiene il file system di Alpine Linux usato dalla sandbox. La reimpostazione elimina tutti i dati e riporta tutto allo stato iniziale.</string>
+    <string name="rootfs_about_description">Il rootfs contiene il file system di Debian Linux usato dalla sandbox. La reimpostazione elimina tutti i dati e riporta tutto allo stato iniziale.</string>
     <string name="rootfs_about_operations">Reimposta: elimina tutto | Backup: salva la directory /root | Ripristina: recupera i dati salvati</string>
     <string name="rootfs_reset_confirm_title">Reimpostare il rootfs?</string>
     <string name="rootfs_reset_confirm_message">Verrà eliminato l\'intero rootfs. Tutti i dati andranno persi.</string>

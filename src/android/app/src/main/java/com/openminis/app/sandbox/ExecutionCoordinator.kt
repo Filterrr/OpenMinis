@@ -289,7 +289,7 @@ object ExecutionCoordinator {
         // This ordering is the first-turn env bug. acquireShellLease() spawns
         // the shell, and it used to run while PRootKernel had not booted yet —
         // so PROOT_LOADER was still empty, proot bare-execve'd the rootfs
-        // busybox, and SELinux killed it on Android 10+:
+        // /bin/sh, and SELinux killed it on Android 10+:
         //
         //   spawn ctx: proot=true rootfs=true loader64=false loader32=false
         //   spawn outcome: alive=false        <- execve("/bin/sh"): Permission denied

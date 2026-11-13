@@ -34,7 +34,7 @@ package com.openminis.app.sandbox
  * bug stops being expressible.
  *
  * The original objection was cold-start cost. Measured on a Pixel 6, inside
- * this project's own PRoot Alpine guest, 20 runs each:
+ * this project's own PRoot Debian guest, 20 runs each:
  *
  *     sh -c "echo hi"          4.2 ms
  *     sh -c "true"             5.7 ms

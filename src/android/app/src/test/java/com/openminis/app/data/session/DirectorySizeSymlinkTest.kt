@@ -41,8 +41,9 @@ class DirectorySizeSymlinkTest {
 
     @Test
     fun `a symlink to a directory is not descended into`() {
-        // The expensive case: the Alpine rootfs and every venv/node_modules
-        // layout has these, and each one re-counted an entire subtree.
+        // The expensive case: the Debian rootfs (merged-/usr) and every
+        // venv/node_modules layout has these, and each one re-counted an
+        // entire subtree.
         val root = tmp.newFolder("root")
         write(File(root, "usr/lib/a.so"), 4_000)
         write(File(root, "usr/lib/b.so"), 6_000)
@@ -55,14 +56,16 @@ class DirectorySizeSymlinkTest {
 
     @Test
     fun `many links to one target inflate nothing`() {
-        // 304 busybox applet links ship in the stock rootfs; the multiplier is
-        // what turns single-digit GB into tens of GB.
+        // [map-debian] Fixture re-pointed from the previous rootfs' multi-call
+        // binary applet links to Debian's versioned shared-library links —
+        // the same shape: many links, one real file. The multiplier is what
+        // turns single-digit GB into tens of GB.
         val root = tmp.newFolder("root")
-        write(File(root, "bin/busybox"), 900_000)
+        write(File(root, "usr/lib/libbig.so.1.2.3"), 900_000)
         repeat(300) { i ->
             Files.createSymbolicLink(
-                File(root, "bin/applet$i").toPath(),
-                File(root, "bin/busybox").toPath(),
+                File(root, "usr/lib/libbig.so.$i").toPath(),
+                File(root, "usr/lib/libbig.so.1.2.3").toPath(),
             )
         }
         assertEquals(900_000L, SessionStorage.directorySize(root))

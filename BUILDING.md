@@ -2,8 +2,10 @@
 
 Minis ships a full Linux sandbox inside the app, so a first build is not just
 "open the project and press Run": the native dependencies (iSH on iOS, PRoot on
-Android, FFmpeg, LAME) and the Alpine rootfs are **built from source by the
-scripts in `deps/`**, not committed as binaries. Budget ~30–60 minutes for the
+Android, FFmpeg, LAME) and the iOS Alpine rootfs are **built from source by the
+scripts in `deps/`**, not committed as binaries — the Android sandbox instead
+uses the prebuilt official `debian:bookworm-slim` layer, fetched from Docker Hub
+by `scripts/prepare_android_sandbox.sh`. Budget ~30–60 minutes for the
 first build; afterwards the artifacts are cached on disk and normal builds are
 fast.
 
@@ -165,6 +167,7 @@ xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
 | CMake | 3.22.1 (install through the SDK Manager) |
 | Go + gomobile | Go **1.25+**, then `go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init` — for rclone |
 | Shell tools | `curl`, `tar`, `make`, `awk`, `sed` |
+| Sandbox base image | Fetched from the Docker Hub registry by `scripts/prepare_android_sandbox.sh` (needs `python3` alongside `curl`/`tar`/`gzip`); on a non-arm64 build host the in-rootfs `apt-get` step also needs `qemu-user-static` (`apt-get install -y qemu-user-static`) |
 
 Gradle itself comes from the wrapper (Gradle 8.11.1, AGP 8.7.3, Kotlin 2.1.0) —
 do not install it separately.
@@ -176,7 +179,7 @@ image.
 
 ```sh
 ./deps/build_proot.sh              # → assets/proot-aarch64, jniLibs/arm64-v8a/*.so
-./scripts/prepare_android_sandbox.sh   # → assets/alpine-minirootfs.tar.gz
+./scripts/prepare_android_sandbox.sh   # → assets/debian-rootfs.tar.gz
 ./deps/build_rclone_android.sh     # → deps/build/rclone/rclone.aar
 mkdir -p src/android/app/libs && cp deps/build/rclone/rclone.aar src/android/app/libs/
 ```
@@ -189,7 +192,7 @@ mkdir -p src/android/app/libs && cp deps/build/rclone/rclone.aar src/android/app
 
   The loaders are required, not optional. Android 10+ enforces W^X for
   `untrusted_app`: nothing labelled `app_data_file` — which includes the whole
-  extracted Alpine rootfs under the app's `files/` dir — can ever be executed.
+  extracted Debian rootfs under the app's `files/` dir — can ever be executed.
   Only `nativeLibraryDir`, populated from `lib/**/*.so` in the APK, is
   executable, so the loader lives there and maps guest binaries itself instead
   of relying on the kernel's `execve`. (proot can normally extract an embedded
@@ -200,15 +203,43 @@ mkdir -p src/android/app/libs && cp deps/build/rclone/rclone.aar src/android/app
   Artifacts are **not** byte-identical across NDK releases; the loader's code
   differs between toolchain generations. Functionally equivalent — don't expect
   checksums to match someone else's build.
-- **`prepare_android_sandbox.sh`** downloads the Alpine aarch64 minirootfs into
-  `assets/`.
+- **`prepare_android_sandbox.sh`** builds the Android sandbox rootfs and writes
+  `src/android/app/src/main/assets/debian-rootfs.tar.gz`. It resolves the
+  official `library/debian:bookworm-slim` image for `linux/arm64/v8` and pulls
+  it **straight from the Docker Hub registry** — `auth.docker.io` for the
+  anonymous pull token, `registry-1.docker.io` for the manifest and the layer
+  blob — then unpacks the single layer, which is the whole Debian 12 rootfs.
+  No Docker daemon and no `docker pull`: the registry HTTP API is enough, so
+  the script runs anywhere with `curl`, `tar`, `gzip` and `python3`.
+
+  It then bakes the base package set into the unpacked rootfs with
+  `apt-get install` (`procps`, `less`, `curl`, `wget`, `ca-certificates`,
+  `unzip`, `xz-utils`, `gawk`, `vim-tiny`; `--no-bake` skips this step and ships
+  the bare image), sets `/etc/hostname`, `/etc/motd` and a fallback
+  `/etc/resolv.conf`, optionally rewrites the apt sources for a mirror
+  (`MIRROR_HOST=…`), and repacks the tree. `/etc/profile.d` and the URL
+  wrappers are **not** written here — the app overlays
+  `src/android/app/src/main/assets/default_mount/` on every boot. The resolved
+  manifest and layer digests land in `debian-rootfs.version` beside the asset,
+  so a build can be reproduced by pinning `DEBIAN_DIGEST`.
+
+  `apt-get` executes the guest's own binaries, so an arm64 host runs them
+  natively; on x86_64 hosts the script copies `qemu-aarch64-static` into the
+  rootfs and execs it explicitly, `debootstrap --foreign` style, so no
+  `binfmt_misc` is required. `qemu-user-static` is not installed by default —
+  `apt-get install -y qemu-user-static` on Debian/Ubuntu hosts. The fetch needs
+  outbound HTTPS to `auth.docker.io` and `registry-1.docker.io`, so a
+  firewalled or offline build fails right here rather than at run time.
 - **`build_rclone_android.sh`** binds rclone with gomobile into an `.aar` for
   the backup feature's remote destinations. It needs `ANDROID_NDK_HOME` (or
   `ANDROID_HOME`) set, and it writes to `deps/build/rclone/`; Gradle reads the
   `.aar` from `src/android/app/libs/`, so copy it there as shown above.
 
 All of these outputs are gitignored — they are build artifacts, so rerun the
-scripts rather than committing them.
+scripts rather than committing them. The Android rootfs lands at
+`src/android/app/src/main/assets/debian-rootfs.tar.gz`, with its resolved image
+digests in `debian-rootfs.version` beside it; keep `.gitignore` in sync if
+either asset is renamed.
 
 The small JNI libraries in `src/main/cpp/` (`pty_bridge`, the crash handler,
 `jieba_jni`) are built by CMake as part of the normal Gradle build; no separate
@@ -231,6 +262,24 @@ required to produce one locally.
 ./gradlew :app:testDebugUnitTest        # JVM unit tests
 ./gradlew :app:connectedAndroidTest     # instrumented; needs a device/emulator
 ```
+
+---
+
+## Sandbox base image
+
+The Android sandbox boots Debian 12 (bookworm) slim, while the iOS sandbox still
+boots Alpine, and the difference shows in the artifacts:
+
+| | Alpine minirootfs (iOS guest) | `debian:bookworm-slim` (Android guest) |
+|---|---|---|
+| Compressed | ~3.6 MB | 34.4 MB with the baked base set (26.8 MB bare image layer) |
+| Extracted | ~8 MB | 125.0 MB with the baked base set (102.6 MB bare image layer) |
+| Userland | BusyBox, `apk` | 120 dpkg packages, `apt-get` / `dpkg` |
+
+The Android rootfs is about ten times the size of the Alpine one, and package
+operations are heavier accordingly: `apt-get update` rewrites the apt lists and
+moves far more data than `apk update` did, so the first package installation in
+a fresh sandbox is noticeably slower.
 
 ---
 
@@ -268,6 +317,15 @@ installation, e.g.
 **Android: app starts but the shell does not** — the sandbox assets are
 missing. Rerun `./deps/build_proot.sh` and
 `./scripts/prepare_android_sandbox.sh`, then rebuild.
+
+**Android: `prepare_android_sandbox.sh` cannot fetch the base image** — it talks
+to the registry directly, so it needs outbound HTTPS to `auth.docker.io` and
+`registry-1.docker.io`. Check that before assuming the script is broken.
+
+**Android: `prepare_android_sandbox.sh` fails inside `apt-get`** — on an x86_64
+build host the Debian rootfs binaries cannot execute without
+`qemu-user-static`. Run `apt-get install -y qemu-user-static` and rerun the
+script.
 
 **Android: every command returns `[Shell not running] (exit code: -1)`** —
 the proot ELF loaders are missing from the APK. Check that

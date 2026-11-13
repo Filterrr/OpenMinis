@@ -14,8 +14,8 @@ import java.io.File
  *
  *  1. PRootKernel.boot() must serialize. It sets `isBooted` only at the end,
  *     so a bare check-then-act let a second caller spawn a shell while
- *     PROOT_LOADER was still unset — proot then bare-execve'd busybox and
- *     SELinux killed it.
+ *     PROOT_LOADER was still unset — proot then bare-execve'd the rootfs
+ *     /bin/sh (dash) and SELinux killed it.
  *  2. applyEnvironment() must record its snapshot BEFORE the liveness check,
  *     and ensureStarted() must replay it. Otherwise exports written to a shell
  *     that is already dead are lost, and the respawn that actually runs the

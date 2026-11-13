@@ -22,7 +22,7 @@ data class SocksEndpoint(
 
     /**
      * http://tag:password@127.0.0.1:httpPort, for HTTP(S)_PROXY: clients
-     * that cannot speak SOCKS (BusyBox wget, apk, Python urllib / pip).
+     * that cannot speak SOCKS (wget, apt-get, Python urllib / pip).
      */
     val httpUrl: String?
         get() = httpPort?.let { "http://${enc(tag)}:${enc(password)}@$host:$it" }

@@ -84,20 +84,20 @@ enum class MirrorCategory(
     val displayName: String,
     val configPath: String,
 ) {
-    ALPINE("alpine", "Alpine APK", "etc/apk/repositories"),
+    APT("apt", "Debian APT", "etc/apt/sources.list.d/debian.sources"),
     PIP("pip", "Python pip", "etc/pip/pip.conf"),
     NPM("npm", "Node.js npm", "root/.npmrc");
 
     val icon: ImageVector
         get() = when (this) {
-            ALPINE -> Icons.Filled.Terrain
+            APT -> Icons.Filled.Terrain
             PIP -> Icons.Filled.Inventory2
             NPM -> Icons.Outlined.Javascript
         }
 
     val iconColor: Color
         get() = when (this) {
-            ALPINE -> Color(0xFF007AFF)
+            APT -> Color(0xFF007AFF)
             PIP -> Color(0xFF34C759)
             NPM -> Color(0xFFFF3B30)
         }
@@ -111,6 +111,20 @@ data class MirrorEntry(
     val category: MirrorCategory,
     val region: String,
     val isOfficial: Boolean = false,
+    /**
+     * Where the `*-security` suite of this mirror lives.
+     *
+     * Debian splits the security archive onto its own path, and NOT every
+     * mirror carries it. Measured with a HEAD on
+     * `<host>/debian-security/dists/bookworm-security/Release`: the official
+     * CDN plus TUNA / Alibaba / USTC / Huawei / Tencent / Kakao serve it (206),
+     * while LEASEWEB, RWTH Aachen and JAIST answer 404. Pointing those three at
+     * a path they do not have turns every `apt-get update` into a hard error
+     * ("404 Not Found ... does not have a Release file"), so they fall back to
+     * security.debian.org — small indices, so the latency cost is negligible
+     * next to the 30 MB of main indices the mirror does serve.
+     */
+    val securityBaseURL: String = baseURL,
 )
 
 data class MirrorTestResult(
@@ -124,10 +138,29 @@ data class MirrorTestResult(
 // ─── Mirror Definitions ──────────────────────────────────────────────────────
 
 object MirrorCatalog {
-    private const val ALPINE_PROBE = "v3.21/main/aarch64/APKINDEX.tar.gz"
+    /**
+     * Probe file for latency/speed tests.
+     *
+     * `dists/<suite>/Release` is the smallest real file every Debian archive
+     * is guaranteed to expose (a few hundred bytes of signed metadata), so a
+     * mirror that answers it is usable and one that does not is not. The
+     * Alpine equivalent was the per-arch APKINDEX tarball.
+     */
+    private const val APT_PROBE = "dists/bookworm/Release"
 
-    private fun alpine(id: String, name: String, url: String, region: String, official: Boolean = false) =
-        MirrorEntry("alpine.$id", name, url, url + ALPINE_PROBE, MirrorCategory.ALPINE, region, official)
+    private const val DEBIAN_SECURITY_OFFICIAL = "https://security.debian.org/debian-security/"
+
+    private fun apt(
+        id: String,
+        name: String,
+        url: String,
+        region: String,
+        official: Boolean = false,
+        securityURL: String = url.replace("/debian/", "/debian-security/"),
+    ) = MirrorEntry(
+        "apt.$id", name, url, url + APT_PROBE, MirrorCategory.APT, region, official,
+        securityBaseURL = securityURL,
+    )
 
     private fun pip(id: String, name: String, url: String, region: String, official: Boolean = false) =
         MirrorEntry("pip.$id", name, url, url, MirrorCategory.PIP, region, official)
@@ -135,17 +168,27 @@ object MirrorCatalog {
     private fun npm(id: String, name: String, url: String, region: String, official: Boolean = false) =
         MirrorEntry("npm.$id", name, url, url, MirrorCategory.NPM, region, official)
 
-    val alpineMirrors = listOf(
-        alpine("official", "Official CDN", "https://dl-cdn.alpinelinux.org/alpine/", "Global", official = true),
-        alpine("tuna", "Tsinghua TUNA", "https://mirrors.tuna.tsinghua.edu.cn/alpine/", "China"),
-        alpine("aliyun", "Alibaba", "https://mirrors.aliyun.com/alpine/", "China"),
-        alpine("ustc", "USTC", "https://mirrors.ustc.edu.cn/alpine/", "China"),
-        alpine("huawei", "Huawei", "https://repo.huaweicloud.com/alpine/", "China"),
-        alpine("tencent", "Tencent", "https://mirrors.cloud.tencent.com/alpine/", "China"),
-        alpine("leaseweb", "LEASEWEB UK", "https://mirror.leaseweb.com/alpine/", "Europe"),
-        alpine("rwth", "RWTH Germany", "https://ftp.halifax.rwth-aachen.de/alpine/", "Europe"),
-        alpine("jaist", "JAIST Japan", "https://ftp.jaist.ac.jp/pub/Linux/alpine/", "Asia"),
-        alpine("kakao", "Kakao Korea", "https://mirror.kakao.com/alpine/", "Asia"),
+    val aptMirrors = listOf(
+        apt("official", "Official CDN", "https://deb.debian.org/debian/", "Global", official = true),
+        apt("tuna", "Tsinghua TUNA", "https://mirrors.tuna.tsinghua.edu.cn/debian/", "China"),
+        apt("aliyun", "Alibaba", "https://mirrors.aliyun.com/debian/", "China"),
+        apt("ustc", "USTC", "https://mirrors.ustc.edu.cn/debian/", "China"),
+        apt("huawei", "Huawei", "https://repo.huaweicloud.com/debian/", "China"),
+        apt("tencent", "Tencent", "https://mirrors.cloud.tencent.com/debian/", "China"),
+        // No /debian-security/ on these three — see MirrorEntry.securityBaseURL.
+        apt(
+            "leaseweb", "LEASEWEB UK", "https://mirror.leaseweb.com/debian/", "Europe",
+            securityURL = DEBIAN_SECURITY_OFFICIAL,
+        ),
+        apt(
+            "rwth", "RWTH Germany", "https://ftp.halifax.rwth-aachen.de/debian/", "Europe",
+            securityURL = DEBIAN_SECURITY_OFFICIAL,
+        ),
+        apt(
+            "jaist", "JAIST Japan", "https://ftp.jaist.ac.jp/pub/Linux/debian/", "Asia",
+            securityURL = DEBIAN_SECURITY_OFFICIAL,
+        ),
+        apt("kakao", "Kakao Korea", "https://mirror.kakao.com/debian/", "Asia"),
     )
 
     val pipMirrors = listOf(
@@ -164,10 +207,10 @@ object MirrorCatalog {
         npm("tencent", "Tencent", "https://mirrors.cloud.tencent.com/npm/", "China"),
     )
 
-    val allMirrors: List<MirrorEntry> = alpineMirrors + pipMirrors + npmMirrors
+    val allMirrors: List<MirrorEntry> = aptMirrors + pipMirrors + npmMirrors
 
     fun mirrors(category: MirrorCategory): List<MirrorEntry> = when (category) {
-        MirrorCategory.ALPINE -> alpineMirrors
+        MirrorCategory.APT -> aptMirrors
         MirrorCategory.PIP -> pipMirrors
         MirrorCategory.NPM -> npmMirrors
     }
@@ -425,7 +468,7 @@ object MirrorSpeedTestViewModel {
         useCustomMirror[category] == true && selectedMirrorId[category] != null
 
     private fun rootfsDataDir(context: Context): File =
-        File(context.applicationContext.filesDir, "alpine-rootfs")
+        File(context.applicationContext.filesDir, "debian-rootfs")
 
     private fun applyMirror(context: Context, category: MirrorCategory) {
         val mirror = selectedMirror(category) ?: return
@@ -443,8 +486,23 @@ object MirrorSpeedTestViewModel {
         }
 
         val content = when (category) {
-            MirrorCategory.ALPINE ->
-                "${mirror.baseURL}v3.21/main\n${mirror.baseURL}v3.21/community\n"
+            // Same deb822 shape the image ships, so the only thing that changes
+            // is the host. `Signed-By` keeps the keyring Debian's own image
+            // points at — an apt source without it is refused outright.
+            MirrorCategory.APT ->
+                """
+                Types: deb
+                URIs: ${mirror.baseURL}
+                Suites: bookworm bookworm-updates
+                Components: main
+                Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+                Types: deb
+                URIs: ${mirror.securityBaseURL}
+                Suites: bookworm-security
+                Components: main
+                Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+                """.trimIndent() + "\n"
             MirrorCategory.PIP -> {
                 val host = try { URI(mirror.baseURL).host ?: "" } catch (_: Exception) { "" }
                 """

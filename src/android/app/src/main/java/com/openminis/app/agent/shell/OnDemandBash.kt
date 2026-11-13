@@ -12,12 +12,15 @@ import kotlinx.coroutines.withContext
  * (T-bash-on-demand §2/§3, F2/M5). Isomorphic to iOS OnDemandBash.swift:
  *   - tri-state availability cache (unavailable has a 10-min TTL; available
  *     self-heals on a later 127),
- *   - host-side 5s network precheck before running apk (F2),
+ *   - host-side 5s network precheck before running apt-get (F2),
  *   - persistent failure backoff (24h / 3-strikes) via SharedPreferences (F2),
  *   - one install attempt per process launch.
  *
- * On Android PRoot runs `apk add` natively (~1-3s), so the wait is minor; the
- * guards still matter for the offline / broken-source case.
+ * On a stock Debian rootfs bash is already installed, so `command -v bash`
+ * succeeds and the install path below is only a fallback for the case where
+ * the user removed bash. When it does run, PRoot runs `apt-get install`
+ * natively (~1-3s), so the wait is minor; the guards still matter for the
+ * offline / broken-source case.
  */
 object OnDemandBash {
 
@@ -32,7 +35,7 @@ object OnDemandBash {
     /** [FIX-261025-05] FreshProcessShell.CANCELLED_EXIT: the user pressed Stop. */
     private const val STOPPED_EXIT = 130
     const val STOPPED_REASON = "stopped by the user"
-    private const val APK_PROBE_URL = "https://dl-cdn.alpinelinux.org/alpine/"
+    private const val APK_PROBE_URL = "https://deb.debian.org/debian/"
 
     private sealed class Availability {
         object Unknown : Availability()
@@ -85,11 +88,11 @@ object OnDemandBash {
 
         if (!networkReachable()) {
             recordFailure(context); markUnavailable()
-            return Outcome.Unavailable("network/apk mirror unreachable")
+            return Outcome.Unavailable("network/apt mirror unreachable")
         }
 
         Log.i(TAG, "installing bash (budget ${INSTALL_BUDGET_MS / 1000}s)…")
-        val rc = executor.run("apk add bash", INSTALL_BUDGET_MS)
+        val rc = executor.run("apt-get install -y bash", INSTALL_BUDGET_MS)
         if (rc == STOPPED_EXIT) {
             // [FIX-261025-05] Stopped mid-install by the user: not a failed
             // install, so no strike and no back-off; a later command may
@@ -103,7 +106,7 @@ object OnDemandBash {
             clearFailure(context)
             availability = Availability.Available
             // A SUCCESSFUL install re-arms the per-launch guard (M5 self-heal:
-            // if the user later apk-del's bash this session, one fresh reinstall
+            // if the user later removes bash this session, one fresh reinstall
             // is still allowed). The guard only blocks repeated FAILING installs.
             attemptedInstallThisLaunch = false
             Log.i(TAG, "bash installed OK")
@@ -111,10 +114,10 @@ object OnDemandBash {
         }
         recordFailure(context); markUnavailable()
         Log.e(TAG, "bash install failed (rc=$rc)")
-        return Outcome.Unavailable("apk add bash failed (rc=$rc)")
+        return Outcome.Unavailable("apt-get install bash failed (rc=$rc)")
     }
 
-    /** Called when `bash <file>` itself returned 127 (user apk del'd) — M5. */
+    /** Called when `bash <file>` itself returned 127 (user removed bash) — M5. */
     suspend fun markDisappeared() = lock.withLock { availability = Availability.Unknown }
 
     private fun markUnavailable() {
@@ -124,7 +127,7 @@ object OnDemandBash {
     private fun backoffReason(context: Context): String? {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val count = p.getInt(KEY_FAIL_COUNT, 0)
-        if (count >= MAX_STRIKES) return "bash install disabled after $MAX_STRIKES failures (retry manually: apk add bash)"
+        if (count >= MAX_STRIKES) return "bash install disabled after $MAX_STRIKES failures (retry manually: apt-get install -y bash)"
         val last = p.getLong(KEY_LAST_FAIL, 0)
         if (last > 0 && System.currentTimeMillis() - last < BACKOFF_WINDOW_MS) return "bash install backing off (recent failure)"
         return null
@@ -143,7 +146,7 @@ object OnDemandBash {
 
     private suspend fun networkReachable(): Boolean = withContext(Dispatchers.IO) {
         try {
-            // [FEAT-261021-16] Probe the way the shell's `apk add` will go: its
+            // [FEAT-261021-16] Probe the way the shell's `apt-get install` will go: its
             // route in Settings > Network (unrouted: the same HttpURLConnection HEAD).
             val code = com.openminis.app.network.NetworkUrlRequest.open(
                 com.openminis.app.network.NetworkScope.SHELL.tag, APK_PROBE_URL, "HEAD",

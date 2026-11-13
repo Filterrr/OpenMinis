@@ -13,9 +13,9 @@ import org.junit.Test
  * [T-shell-stall-yes-head] Agent shells must start with SIGPIPE unblocked.
  *
  * ART blocks SIGPIPE in every app thread and ProcessBuilder's child keeps that
- * mask, so busybox `yes STRING | head -c N` spun on EPIPE forever and the
+ * mask, so coreutils `yes STRING | head -c N` spun on EPIPE forever and the
  * shell_execute call hung until its timeout (Pixel 4a, W2 run: 6+ minutes).
- * Reproduced off-device on Alpine 3.21 busybox 1.37.0: the same runner line
+ * Reproduced off-device on Debian 12 (bookworm) coreutils: the same runner line
  * finishes in 0.03 s with the default mask and never finishes with SIGPIPE
  * blocked or ignored. The JNI half needs a device; these tests pin the
  * Kotlin half (order, restore, failure handling) and that every ProcessBuilder

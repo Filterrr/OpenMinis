@@ -110,7 +110,7 @@ object TerminalSanitizer {
      * [T-android-sanitize-cr-escapes] Escape sequences are ZERO-width here.
      * The fold used to run on the raw text, before escape stripping, so the
      * invisible bytes counted as screen columns: `Downloading 50%\r\e[KDone`
-     * (pip / npm / apk / git progress) rendered as "Doneding 50%" because
+     * (pip / npm / apt / git progress) rendered as "Doneding 50%" because
      * ESC[K was treated as 3 printable chars instead of "erase to end of
      * line", and a coloured segment overwritten by a plain one kept the old
      * visible text while the overwrite landed on the colour codes. Lines with

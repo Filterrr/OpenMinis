@@ -302,7 +302,7 @@
     <string name="settings_env_vars">環境變數</string>
     <string name="settings_env_vars_subtitle">注入沙箱的變數</string>
     <string name="settings_section_storage">儲存空間</string>
-    <string name="settings_storage_subtitle">管理 Alpine Linux rootfs 並瀏覽檔案</string>
+    <string name="settings_storage_subtitle">管理 Debian Linux rootfs 並瀏覽檔案</string>
     <string name="settings_section_permissions">權限</string>
     <string name="settings_permissions_subtitle">控管 Agent 對隱私相關功能的存取</string>
     <string name="settings_section_logs">記錄</string>
@@ -1000,7 +1000,7 @@
     <string name="rootfs_result_section">結果</string>
     <string name="rootfs_info_section">資訊</string>
     <string name="rootfs_about_title">關於 Rootfs</string>
-    <string name="rootfs_about_description">Rootfs 包含沙箱所使用的 Alpine Linux 檔案系統。重設會刪除所有資料並還原為出廠狀態。</string>
+    <string name="rootfs_about_description">Rootfs 包含沙箱所使用的 Debian Linux 檔案系統。重設會刪除所有資料並還原為出廠狀態。</string>
     <string name="rootfs_about_operations">重設：刪除所有內容 | 備份：儲存 /root 目錄 | 復原：取回已儲存的資料</string>
     <string name="rootfs_reset_confirm_title">要重設 Rootfs 嗎？</string>
     <string name="rootfs_reset_confirm_message">這會刪除整個 rootfs，所有資料都會遺失。</string>

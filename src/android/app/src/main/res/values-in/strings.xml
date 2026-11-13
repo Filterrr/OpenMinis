@@ -296,7 +296,7 @@
     <string name="settings_env_vars">Variabel Lingkungan</string>
     <string name="settings_env_vars_subtitle">Variabel yang disuntikkan ke sandbox</string>
     <string name="settings_section_storage">Penyimpanan</string>
-    <string name="settings_storage_subtitle">Kelola rootfs Alpine Linux dan jelajahi berkas</string>
+    <string name="settings_storage_subtitle">Kelola rootfs Debian Linux dan jelajahi berkas</string>
     <string name="settings_section_permissions">Izin</string>
     <string name="settings_permissions_subtitle">Kontrol akses Agen ke fitur sensitif privasi</string>
     <string name="settings_section_logs">Log</string>
@@ -962,7 +962,7 @@
     <string name="rootfs_result_section">Hasil</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">Tentang Rootfs</string>
-    <string name="rootfs_about_description">Rootfs berisi sistem berkas Alpine Linux yang digunakan oleh sandbox. Mengatur ulang akan menghapus semua data dan mengembalikannya ke kondisi awal.</string>
+    <string name="rootfs_about_description">Rootfs berisi sistem berkas Debian Linux yang digunakan oleh sandbox. Mengatur ulang akan menghapus semua data dan mengembalikannya ke kondisi awal.</string>
     <string name="rootfs_about_operations">Atur Ulang: Hapus semuanya | Cadangkan: Simpan direktori /root | Pulihkan: Kembalikan data tersimpan</string>
     <string name="rootfs_reset_confirm_title">Atur Ulang Rootfs?</string>
     <string name="rootfs_reset_confirm_message">Ini akan menghapus seluruh rootfs. Semua data akan hilang.</string>

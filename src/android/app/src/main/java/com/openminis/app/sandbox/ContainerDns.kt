@@ -14,7 +14,7 @@ import android.content.SharedPreferences
  * sing-box): public resolvers there leak queries and hand back real IPs that
  * bypass the proxy. But some networks (a LAN, Tailscale, a private VPN)
  * advertise resolvers that cannot resolve public names, and then every
- * `apk add` / `pip install` / `git clone` in the sandbox times out.
+ * `apt-get install` / `pip install` / `git clone` in the sandbox times out.
  *
  * So the choice is the user's: [DnsMode.AUTO] (default, unchanged
  * behaviour) or [DnsMode.CUSTOM], where resolv.conf lists exactly the servers
@@ -43,7 +43,7 @@ object ContainerDns {
     }
 
     /**
-     * musl (Alpine) reads at most this many `nameserver` lines (MAXNS); the
+     * glibc (on Debian) reads at most this many `nameserver` lines (MAXNS); the
      * rest are ignored. Extra entries are still written — they do no harm —
      * but the editor says so.
      */

@@ -32,7 +32,7 @@ package com.openminis.app.sandbox
  * The kernel already tracks exactly this, so ask it instead. Each foreground
  * command runs under `setsid`, which puts it in a brand-new session and
  * process group whose pgid equals its pid. Verified in this project's own
- * Alpine guest (`/proc/<pid>/stat` field 5):
+ * Debian guest (`/proc/<pid>/stat` field 5):
  *
  *     shell           pid=23997  pgid=946     <- the persistent shell
  *     setsid child    pid=24027  pgid=24027   <- its own group
@@ -61,7 +61,7 @@ package com.openminis.app.sandbox
  */
 internal object ForegroundCommandGroup {
 
-    /** Guest path to `setsid`, present in the shipped Alpine rootfs. */
+    /** Guest path to `setsid`, present in the shipped Debian rootfs. */
     const val SETSID = "/usr/bin/setsid"
 
     /**
@@ -71,7 +71,7 @@ internal object ForegroundCommandGroup {
      * The wrapper prints `__MINIS_PGID_<marker>_<pgid>__` first, so the host
      * learns which group to kill without having to hunt for the pid. It is
      * emitted by the subshell itself — reading `/proc/self/stat` field 5 —
-     * because busybox `ps` has no `-o pgid=`.
+     * because that needs no `ps` binary at all.
      *
      * `exec` replaces the subshell with the user's command where possible, so
      * there is no extra shell sitting between the group leader and the work.

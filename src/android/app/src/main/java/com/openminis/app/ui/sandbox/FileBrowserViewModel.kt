@@ -210,7 +210,7 @@ class FileBrowserViewModel(
     // linuxRootPath: when set, directory listings route through PRootKernel
     // bind mounts so subdirs like /var/minis/{skills,memory,shared} list their
     // real content (filesDir/minis-global/*) instead of the empty placeholder
-    // dirs shipped inside the Alpine rootfs tarball.
+    // dirs shipped inside the Debian rootfs tarball.
     private val linuxRootPath: String? = null,
     // T147: when set together with [appContext], `/var/minis/{attachments,
     // workspace,offloads,browser}` resolves against THIS session's per-session

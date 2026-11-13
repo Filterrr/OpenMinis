@@ -1,0 +1,313 @@
+name: Sandbox (Debian)
+
+# Builds and validates the Android sandbox base image now that it is Debian 12
+# "bookworm" slim instead of an Alpine minirootfs, and optionally assembles the
+# Android APK against it.
+#
+# Why the rootfs has a CI job of its own: the asset is built from a third-party
+# image (Docker Hub `library/debian:bookworm-slim`) by an apt run inside the
+# rootfs, so it can break for reasons that have nothing to do with this repo —
+# an upstream base-image bump, a mirror outage, a maintainer script that needs
+# /proc. Those failures are cheap to catch here and expensive to catch on a
+# device, so this job rebuilds the image from scratch and asserts the shape of
+# what came out rather than trusting the last local build.
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/sandbox-debian-slim'
+    paths:
+      - 'scripts/prepare_android_sandbox.sh'
+      - 'scripts/tests/extract_tar_replica.py'
+      - '.github/workflows/sandbox-debian.yml'
+      - 'src/android/app/src/main/assets/default_mount/**'
+      - 'src/android/app/src/main/java/com/openminis/app/sandbox/**'
+      - 'src/android/app/src/main/res/xml/file_provider_paths.xml'
+      - 'deps/build_proot.sh'
+      - 'deps/proot/**'
+  pull_request:
+    paths:
+      - 'scripts/prepare_android_sandbox.sh'
+      - 'scripts/tests/extract_tar_replica.py'
+      - '.github/workflows/sandbox-debian.yml'
+      - 'src/android/app/src/main/assets/default_mount/**'
+      - 'src/android/app/src/main/java/com/openminis/app/sandbox/**'
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: 'Also assemble the Android APK (slow: builds PRoot + rclone from source)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sandbox-debian-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. Build the Debian rootfs asset and assert its shape.
+  # ───────────────────────────────────────────────────────────────────────────
+  rootfs:
+    name: Debian rootfs asset
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host tooling
+        run: |
+          sudo apt-get update -qq
+          # qemu-user-static is what lets an x86_64 runner execute the aarch64
+          # binaries inside the rootfs (apt-get, dpkg's maintainer scripts).
+          # Without it the build cannot bake the base package set at all.
+          sudo apt-get install -y -qq qemu-user-static
+
+      - name: Self-test the asset checker
+        run: |
+          # A validator that can only say "OK" is worse than none: prove it
+          # actually rejects a bad archive before trusting its verdict below.
+          python3 scripts/tests/selftest_check_rootfs_asset.py
+
+      - name: Build the rootfs
+        run: |
+          # No --require-proot: the PRoot binary is a separate artifact built by
+          # deps/build_proot.sh (or the android job below) and merged into the
+          # same assets dir. Its absence must not block the rootfs.
+          ./scripts/prepare_android_sandbox.sh --verify
+
+      - name: Assert the asset's structure
+        run: |
+          # Entry types, .l2s.* sentinels, extension headers and the emptiness
+          # of /dev, /proc, /sys — every rule maps to a way the app's own tar
+          # parser loses or mangles data. See the script's docstring.
+          python3 scripts/tests/check_rootfs_asset.py \
+            src/android/app/src/main/assets/debian-rootfs.tar.gz
+          echo
+          cat src/android/app/src/main/assets/debian-rootfs.version
+
+      - name: Prove the app's tar parser can extract it
+        run: |
+          # Extracts the asset with a byte-for-byte replica of the Kotlin
+          # parser in RootfsManager.extractTar and fails if any entry would be
+          # silently dropped on a device.
+          python3 scripts/tests/extract_tar_replica.py \
+            src/android/app/src/main/assets/debian-rootfs.tar.gz /tmp/roundtrip
+
+      - name: Boot the extracted rootfs
+        run: |
+          set -euo pipefail
+          # This host is x86_64, so run the aarch64 userspace through qemu —
+          # the same way the build script does internally. It is the closest
+          # thing to a device boot CI can do: proof that the interpreter, the
+          # coreutils set, apt and the baked apt sources actually work.
+          sudo cp "$(command -v qemu-aarch64-static)" /tmp/roundtrip/usr/bin/
+          run() {
+            sudo chroot /tmp/roundtrip /usr/bin/env -i \
+              PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+              HOME=/root TMPDIR=/tmp LC_ALL=C \
+              /usr/bin/qemu-aarch64-static "$@"
+          }
+
+          run /bin/bash -c 'cat /etc/debian_version'
+          run /bin/bash -c 'grep -q "Debian GNU/Linux 12" /etc/os-release'
+          run /bin/sh   -c 'test "$(readlink -f /bin/sh)" = /usr/bin/dash'
+          run /bin/bash -c 'for c in bash ps top less curl wget gawk unzip xz vi dpkg apt-get; do command -v "$c" >/dev/null || { echo "missing: $c"; exit 1; }; done'
+          run /bin/bash -c 'apt-get --version | head -1'
+          # The point of baking the sources in: apt must refresh them offline
+          # of any app-side setup.
+          run /bin/bash -c 'apt-get update -qq && echo "apt-get update OK"'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian-rootfs
+          path: |
+            src/android/app/src/main/assets/debian-rootfs.tar.gz
+            src/android/app/src/main/assets/debian-rootfs.version
+          retention-days: 7
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 2. Cheap static checks over the shipped overlay and the asset hygiene rules.
+  # ───────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Sandbox scripts and overlay
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          set -euo pipefail
+          bash -n scripts/prepare_android_sandbox.sh
+
+          # The overlay is executed inside the Debian guest, whose /bin/sh is
+          # dash, so bash-only syntax must not creep in. `sh -n` on Ubuntu is
+          # dash — exactly the target interpreter.
+          status=0
+          while IFS= read -r f; do
+            echo "sh -n $f"
+            sh -n "$f" || status=1
+          done <<< "$(find src/android/app/src/main/assets/default_mount -type f \
+              \( -name '*.sh' -o -path '*/bin/*' \) | sort)"
+          exit $status
+
+      - name: Python syntax
+        run: |
+          set -euo pipefail
+          find src/android/app/src/main/assets/default_mount scripts/tests \
+            -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
+          find . -name '__pycache__' -type d -prune -exec rm -rf {} +
+
+      - name: Kotlin structure (comment/string sweep guard)
+        run: |
+          set -euo pipefail
+          # Not a compiler — a lexer that catches the one failure mode a large
+          # comment/string sweep produces: an unterminated raw string, an
+          # unbalanced brace, a mangled template. The real compile is the APK
+          # job; this exists so a broken sweep fails in seconds.
+          #
+          # Prove it can fail before trusting it to pass.
+          tmp="$(mktemp -d)"
+          printf 'fun main() {\n    val s = """\n    oops\n}\n' > "$tmp/broken.kt"
+          if python3 scripts/tests/check_kotlin_structure.py "$tmp/broken.kt" > /dev/null; then
+            echo "::error::check_kotlin_structure.py did not reject a broken file"
+            exit 1
+          fi
+          rm -rf "$tmp"
+
+          find src/android -name '*.kt' -print0 \
+            | xargs -0 python3 scripts/tests/check_kotlin_structure.py > /tmp/kotlin-structure.log 2>&1 \
+            || { tail -50 /tmp/kotlin-structure.log; exit 1; }
+          tail -2 /tmp/kotlin-structure.log
+
+      - name: JSON and XML well-formedness
+        run: |
+          set -euo pipefail
+          python3 -m json.tool src/shared/bashism/bashism_rules.json > /dev/null
+          python3 -m json.tool src/shared/bashism/bashism_test_vectors.json > /dev/null
+          python3 - <<'PY'
+          import glob, xml.dom.minidom
+          files = glob.glob('src/android/app/src/main/res/values*/strings.xml') + \
+                  ['src/android/app/src/main/res/xml/file_provider_paths.xml']
+          for f in files:
+              xml.dom.minidom.parse(f)
+          print(f'{len(files)} resource XML file(s) OK')
+          PY
+
+      - name: The guest overlay must not resurrect the Alpine baseline
+        run: |
+          set -euo pipefail
+          # apk/busybox/musl in the overlay would fail at runtime: none of them
+          # exists in a Debian rootfs.
+          if grep -rInE '(^|[^-[:alnum:]])apk +(--quiet +)?(add|del|update)|/bin/busybox' \
+               src/android/app/src/main/assets/default_mount; then
+            echo "::error::Alpine package manager / busybox referenced in the guest overlay"
+            exit 1
+          fi
+          echo "overlay is free of apk/busybox"
+
+      - name: The rootfs FileProvider path must match RootfsManager
+        run: |
+          set -euo pipefail
+          dir="$(grep -oE 'File\(context\.filesDir, "[a-z-]+rootfs"\)' \
+                  src/android/app/src/main/java/com/openminis/app/sandbox/RootfsManager.kt \
+                  | head -1 | sed -E 's/.*"([a-z-]+)".*/\1/')"
+          echo "RootfsManager.rootfsDir = $dir"
+          test "$dir" = "debian-rootfs" || { echo "::error::unexpected rootfs dir name"; exit 1; }
+          grep -q "path=\"$dir/\"" src/android/app/src/main/res/xml/file_provider_paths.xml \
+            || { echo "::error::file_provider_paths.xml does not expose $dir/"; exit 1; }
+          echo "FileProvider path OK"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 3. Full APK. Slow, and skipped on pull_request to keep reviews fast: it
+  #    compiles PRoot (NDK), rclone (Go + gomobile) and the app — none of which
+  #    the sandbox change touches — but it is the only job that proves the new
+  #    asset actually assembles into a buildable APK.
+  # ───────────────────────────────────────────────────────────────────────────
+  android-apk:
+    name: Android APK
+    needs: rootfs
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_android) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Only the Android sandbox needs a submodule (deps/proot). deps/ish is
+          # the iOS kernel fork; fetching it here is pure cost.
+          submodules: false
+      - name: Fetch the proot submodule
+        run: git submodule update --init deps/proot
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install the Android NDK
+        run: |
+          # deps/build_proot.sh requires NDK r28+ and looks in
+          # ~/Library/Android/sdk/ndk/28.0.12433566 by default — an Android
+          # Studio path that does not exist on a Linux runner, so point
+          # ANDROID_NDK_HOME at the install explicitly.
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install 'ndk;28.0.12433566' > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.0.12433566" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Build PRoot (native sandbox binary)
+        run: ./deps/build_proot.sh
+
+      - name: Build rclone.aar
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init
+          ./deps/build_rclone_android.sh
+          mkdir -p src/android/app/libs
+          cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: debian-rootfs
+          path: src/android/app/src/main/assets
+
+      - name: Verify every sandbox asset is in place
+        run: |
+          set -euo pipefail
+          ls -lh src/android/app/src/main/assets/debian-rootfs.tar.gz \
+                 src/android/app/src/main/assets/debian-rootfs.version \
+                 src/android/app/src/main/assets/proot-aarch64 \
+                 src/android/app/libs/rclone.aar \
+                 src/android/app/src/main/jniLibs/arm64-v8a/libproot.so
+          for f in src/android/app/src/main/assets/debian-rootfs.tar.gz \
+                   src/android/app/src/main/assets/proot-aarch64 \
+                   src/android/app/libs/rclone.aar \
+                   src/android/app/src/main/jniLibs/arm64-v8a/libproot.so; do
+            test -s "$f" || { echo "::error::missing or empty: $f"; exit 1; }
+          done
+
+      - name: Build the debug APK
+        working-directory: src/android
+        run: |
+          cp app/provider-customization.properties.example app/provider-customization.properties
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Report
+        run: find src/android/app/build/outputs/apk -name '*.apk' -printf '%p  %s bytes\n' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openminis-debug-apk-debian-sandbox
+          path: src/android/app/build/outputs/apk/**/*.apk
+          retention-days: 7

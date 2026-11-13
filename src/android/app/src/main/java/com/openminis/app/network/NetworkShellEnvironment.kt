@@ -92,7 +92,7 @@ object NetworkShellEnvironment {
             ep?.httpPort != null -> "ALL_PROXY -> socks5h://shell:<password>@127.0.0.1:${ep.port}, " +
                 "HTTP(S)_PROXY -> http://shell:<password>@127.0.0.1:${ep.httpPort}, NO_PROXY=$NO_PROXY route=${route.raw}"
             else -> "ALL_PROXY -> socks5h://shell:<password>@127.0.0.1:${ep?.port}, NO_PROXY=$NO_PROXY; " +
-                "HTTP(S)_PROXY NOT set (the http front is not listening, so wget / apk / pip connect directly) route=${route.raw}"
+                "HTTP(S)_PROXY NOT set (the http front is not listening, so wget / apt-get / pip connect directly) route=${route.raw}"
         }
         val mcpState = when {
             ShellProxyVariables.MCP_PROXY_KEY !in vars -> "MINIS_MCP_PROXY none (entry off: minis-mcp-cli as before)"
@@ -118,7 +118,7 @@ object NetworkShellEnvironment {
  * with `curl --proxy` or by routing the Shell scope.
  *
  * [iOS 62f3577a3] HTTP(S)_PROXY name the entry's HTTP front (http://), not
- * the SOCKS entry: BusyBox wget, Alpine apk (libfetch) and Python urllib /
+ * the SOCKS entry: wget, apt-get and Python urllib /
  * pip / requests cannot use a socks5h:// HTTP(S)_PROXY, and wget's error
  * then printed the URL, entry password included, into the agent's
  * transcript. Without the front they are left unset (those tools connect

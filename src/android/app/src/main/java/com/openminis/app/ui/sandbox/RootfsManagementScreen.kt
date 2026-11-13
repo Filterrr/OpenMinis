@@ -295,7 +295,7 @@ fun RootfsManagementScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "The rootfs contains the Alpine Linux filesystem used by " +
+                        text = "The rootfs contains the Debian Linux filesystem used by " +
                             "the sandbox. Resetting will delete all data and restore to " +
                             "factory state.",
                         style = MaterialTheme.typography.bodySmall,

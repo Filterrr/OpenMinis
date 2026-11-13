@@ -223,13 +223,14 @@ class SessionStorage(private val filesDir: File) {
          * walk behaved like `du -L`, not `du`:
          *
          *   - a symlink to a FILE was counted as a second full copy of the
-         *     target's bytes (the Alpine rootfs ships ~335 of these — busybox
-         *     applets — and a user's apk installs add more);
+         *     target's bytes (the Debian rootfs ships plenty — `.so` version
+         *     links, update-alternatives links, `/usr/bin/sh -> dash` — and a
+         *     user's apt-get installs add more);
          *   - a symlink to a DIRECTORY was DESCENDED INTO, so the whole target
          *     subtree was counted again, once per link pointing at it. This is
          *     what turns a few GB of real files into tens of GB on the storage
          *     screen: `lib -> usr/lib`, `.venv/lib64 -> lib`, node_modules and
-         *     apk layouts all create them, and the inflation multiplies rather
+         *     dpkg layouts all create them, and the inflation multiplies rather
          *     than adds.
          *
          * A user reported "Shell 容器 43.89 GB" while Android's own app-storage

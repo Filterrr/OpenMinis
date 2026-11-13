@@ -17,7 +17,7 @@ class ToolSpeechTest {
     fun `shell uses the model's title when it supplied one`() {
         assertEquals(
             "Executing script: install deps",
-            ToolSpeech.announcement("shell_execute", """{"command":"apk add py3-pip"}""", "install deps"),
+            ToolSpeech.announcement("shell_execute", """{"command":"apt-get install -y python3-pip"}""", "install deps"),
         )
     }
 
@@ -25,8 +25,8 @@ class ToolSpeechTest {
     @Test
     fun `shell falls back to the command`() {
         assertEquals(
-            "Executing script: apk add py3-pip",
-            ToolSpeech.announcement("shell_execute", """{"command":"apk add py3-pip"}""", null),
+            "Executing script: apt-get install -y python3-pip",
+            ToolSpeech.announcement("shell_execute", """{"command":"apt-get install -y python3-pip"}""", null),
         )
     }
 
@@ -40,7 +40,7 @@ class ToolSpeechTest {
     fun `a chinese title switches the whole phrase to chinese`() {
         assertEquals(
             "正在执行脚本:安装依赖包",
-            ToolSpeech.announcement("shell_execute", """{"command":"apk add py3-pip"}""", "安装依赖包"),
+            ToolSpeech.announcement("shell_execute", """{"command":"apt-get install -y python3-pip"}""", "安装依赖包"),
         )
         assertEquals(
             "正在读取文件:配置文件",
@@ -133,7 +133,7 @@ class ToolSpeechTest {
     fun `malformed or partial json does not throw`() {
         assertEquals(
             "Executing script: ",
-            ToolSpeech.announcement("shell_execute", """{"command":"apk add py""", null),
+            ToolSpeech.announcement("shell_execute", """{"command":"apt-get install -y py""", null),
         )
         assertEquals("Reading file: a file", ToolSpeech.announcement("file_read", "not json", null))
         assertEquals("Executing script: ", ToolSpeech.announcement("shell_execute", null, null))

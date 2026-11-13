@@ -15,8 +15,22 @@ OpenMinis bundles, links, or depends on the following third-party components. Ve
 | [LAME](https://lame.sourceforge.io) | 3.100, vendored at `deps/lame-3.100` | **LGPL-2.0-or-later** | MP3 encoder, linked into FFmpeg via `--enable-libmp3lame` |
 | [talloc](https://talloc.samba.org) (Samba) | vendored at `deps/talloc` | **LGPL-3.0-or-later** | Memory allocator required by proot |
 | [cppjieba](https://github.com/yanyiwu/cppjieba) | vendored (iOS `Vendor/cppjieba`, Android `jieba_jni`) | **MIT** | Chinese word segmentation (header-only + dictionaries) |
-| Alpine Linux minirootfs | downloaded at build time by `deps/prepare_alpine_rootfs.sh` | Aggregate of package licenses (musl **MIT**, BusyBox **GPL-2.0**, etc.) | Not stored in this repo; bundled into app builds as the default rootfs |
-| Alpine packages for the AOJIT restore (`busybox`, `busybox-binsh`, `ssl_client` 1.37.0-r8; `musl`, `musl-utils` 1.2.5-r8) | Original signed Alpine 3.21 packages, vendored as binaries in `src/ios/AOJITRestore/` | **GPL-2.0-only** (BusyBox, ssl_client), **MIT** (musl) | Used by `restore.sh` to put a rootfs back on the exact builds the AOT images match; the Alpine mirror no longer carries these builds. Corresponding source: Alpine aports `main/busybox` and `main/musl` at the 3.21 release, and upstream [busybox.net](https://busybox.net) / [musl.libc.org](https://musl.libc.org) |
+| Alpine Linux minirootfs | downloaded at build time by `deps/prepare_alpine_rootfs.sh` | Aggregate of package licenses (musl **MIT**, BusyBox **GPL-2.0**, etc.) | **iOS builds only** — the Android guest boots Debian (below). Not stored in this repo; bundled into iOS builds as the default rootfs |
+| Alpine packages for the AOJIT restore (`busybox`, `busybox-binsh`, `ssl_client` 1.37.0-r8; `musl`, `musl-utils` 1.2.5-r8) | Original signed Alpine 3.21 packages, vendored as binaries in `src/ios/AOJITRestore/` | **GPL-2.0-only** (BusyBox, ssl_client), **MIT** (musl) | **iOS builds only.** Used by `restore.sh` to put a rootfs back on the exact builds the AOT images match; the Alpine mirror no longer carries these builds. Corresponding source: Alpine aports `main/busybox` and `main/musl` at the 3.21 release, and upstream [busybox.net](https://busybox.net) / [musl.libc.org](https://musl.libc.org) |
+| [Debian GNU/Linux](https://www.debian.org) 12 (`bookworm-slim`) | Official `library/debian:bookworm-slim` image for `linux/arm64/v8`, fetched from the Docker Hub registry at build time by `scripts/prepare_android_sandbox.sh` | Debian Social Contract / DFSG free software; each binary package carries its own licence (GPL, LGPL, BSD, MIT, public domain, …) | **Android builds only** — the iOS guest boots Alpine (above). Not stored in this repo; bundled into Android builds as the default rootfs |
+| glibc | Debian `libc6` in the Android rootfs | **LGPL-2.1-or-later** | C library of the Android sandbox; replaces musl, which is no longer present |
+| dash | Debian `dash` package, installed as `/bin/sh` | **BSD-3-Clause** | POSIX shell used for `/bin/sh` in the Android sandbox |
+| GNU bash | Debian `bash` package | **GPL-3.0-or-later** | `/bin/bash`, preinstalled in the Android rootfs |
+| GNU coreutils | Debian `coreutils` package | **GPL-3.0-or-later** | `/bin/ls`, `cp`, `cat`, `install`, etc. in the Android sandbox |
+| procps | Debian `procps` package, baked into the base set | **GPL-2.0-or-later** / **GPL-3.0-or-later** | `ps`, `top`, `free`, etc. in the Android rootfs |
+| less | Debian `less` package, baked into the base set | **GPL-3.0-or-later** | Pager in the Android rootfs |
+| curl (`/usr/bin/curl`) | Debian `curl` package, baked into the base set | curl licence (MIT-like) | HTTP client in the Android rootfs |
+| wget | Debian `wget` package, baked into the base set | **GPL-3.0-or-later** | HTTP client in the Android rootfs |
+| ca-certificates | Debian `ca-certificates` package, baked into the base set | **MPL-2.0** | Mozilla CA bundle for the Android rootfs |
+| gawk | Debian `gawk` package, baked into the base set | **GPL-3.0-or-later** | `awk` in the Android rootfs |
+| unzip | Debian `unzip` package, baked into the base set | Info-ZIP licence | ZIP extractor in the Android rootfs |
+| xz-utils | Debian `xz-utils` package, baked into the base set | Public domain / **LGPL-2.1-or-later** (liblzma) | `xz` compressor in the Android rootfs |
+| vim-tiny | Debian `vim-tiny` package, baked into the base set | Vim licence (GPL-compatible charityware) | Minimal `vi` in the Android rootfs |
 
 ## iOS — Swift Package Manager dependencies
 

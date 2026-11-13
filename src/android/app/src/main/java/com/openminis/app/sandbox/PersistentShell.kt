@@ -216,12 +216,12 @@ class PersistentShell(
         // bc2566b2, and at least one custom-ROM death we couldn't classify),
         // and a user log that only says "process exited" cannot tell them
         // apart. Loader presence is the first thing to rule out: without
-        // PROOT_LOADER, proot bare-execve's rootfs busybox and SELinux kills
+        // PROOT_LOADER, proot bare-execve's rootfs /bin/sh and SELinux kills
         // it on Android 10+ (see a25d93f7).
         com.openminis.app.logging.AppLogger.info(
             TAG,
             "spawn ctx: proot=${rootfsManager.prootBinary.exists()} " +
-                "rootfs=${File(rootfsManager.rootfsDir, "bin/busybox").exists()} " +
+                "rootfs=${File(rootfsManager.rootfsDir, "bin/sh").exists()} " +
                 "loader64=${PRootKernel.prootLoaderPath.isNotEmpty()} " +
                 "loader32=${PRootKernel.prootLoader32Path.isNotEmpty()}",
         )
@@ -238,7 +238,7 @@ class PersistentShell(
         cmd.add(rootfsManager.prootBinary.absolutePath)
         cmd.add("-0")
         // T141: see PRootKernel.buildProotCommand for rationale — translates
-        // hardlinks to symlinks so apk install of binutils/gcc works.
+        // hardlinks to symlinks so apt-get install of binutils/gcc works.
         cmd.add("--link2symlink")
         cmd.add("-r")
         cmd.add(rootfsManager.rootfsDir.absolutePath)

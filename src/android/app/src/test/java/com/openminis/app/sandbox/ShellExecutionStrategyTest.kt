@@ -22,7 +22,7 @@ import org.junit.Test
  * defect is structural: control and data share a channel the command can
  * write to.
  *
- * Measured on a Pixel 6 inside this project's PRoot Alpine guest, 20 runs:
+ * Measured on a Pixel 6 inside this project's PRoot Debian guest, 20 runs:
  *
  *     sh -c "echo hi"          4.2 ms
  *     setsid sh -c "echo hi"   8.5 ms

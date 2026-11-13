@@ -60,7 +60,7 @@ internal object ContainerDnsFields {
             displayName = "Sandbox custom DNS servers",
             description = "IPv4 / IPv6 addresses used when $MODE_PATH is custom: a string separated by newlines, commas " +
                 "or spaces (quote it: '\"223.5.5.5, 2400:3200::1\"'), or a JSON array of strings. Every entry must be an " +
-                "IP literal — hostnames are rejected. The sandbox resolver (musl) uses the first " +
+                "IP literal — hostnames are rejected. The sandbox resolver (glibc) uses the first " +
                 "${ContainerDns.RESOLVER_MAX_SERVERS}. Stored one per line. Applied immediately when mode is custom.",
             valueSchema = ConfigSchema.Json,
             risk = ConfigRisk.NORMAL,

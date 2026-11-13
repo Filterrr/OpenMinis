@@ -344,7 +344,7 @@
     <string name="settings_env_vars">Environment Variables</string>
     <string name="settings_env_vars_subtitle">Variables injected into the sandbox</string>
     <string name="settings_section_storage">Storage</string>
-    <string name="settings_storage_subtitle">Manage Alpine Linux rootfs and browse files</string>
+    <string name="settings_storage_subtitle">Manage Debian Linux rootfs and browse files</string>
     <string name="settings_section_permissions">Permissions</string>
     <string name="settings_permissions_subtitle">Control Agent access to privacy-sensitive features</string>
     <string name="settings_section_logs">Logs</string>
@@ -1094,7 +1094,7 @@
     <string name="rootfs_result_section">Result</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">About Rootfs</string>
-    <string name="rootfs_about_description">The rootfs contains the Alpine Linux filesystem used by the sandbox. Resetting will delete all data and restore to factory state.</string>
+    <string name="rootfs_about_description">The rootfs contains the Debian Linux filesystem used by the sandbox. Resetting will delete all data and restore to factory state.</string>
     <string name="rootfs_about_operations">Reset: Delete everything | Backup: Save /root directory | Restore: Recover saved data</string>
     <string name="rootfs_reset_confirm_title">Reset Rootfs?</string>
     <string name="rootfs_reset_confirm_message">This will delete the entire rootfs. All data will be lost.</string>

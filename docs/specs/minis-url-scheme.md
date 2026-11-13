@@ -153,7 +153,8 @@ let linuxPath = "/var/minis/\(url.host!)\(url.path)"
 /var/minis/<namespace>/<path>  →  <dataPath>/var/minis/<namespace>/<path>
 ```
 
-Where `dataPath` = `~/Documents/alpine-rootfs/data/`.
+Where `dataPath` = `~/Documents/alpine-rootfs/data/` — the iOS iSH layout; the Android
+sandbox runs its Debian rootfs from `filesDir/debian-rootfs` instead.
 
 ```swift
 func resolveHostPath(_ linuxPath: String) -> URL? {

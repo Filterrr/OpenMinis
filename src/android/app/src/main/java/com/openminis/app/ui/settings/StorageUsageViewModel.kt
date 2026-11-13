@@ -110,7 +110,7 @@ internal object SessionStorageRows {
  * The screen used to keep its numbers in `remember` state and measure in
  * `LaunchedEffect(Unit)`. Navigation Compose disposes a destination's
  * composition when another screen is pushed on top, so every return from a
- * session's detail page re-ran the whole scan: the Alpine rootfs walk, the
+ * session's detail page re-ran the whole scan: the rootfs walk, the
  * database, logs, and every session's workspace plus the media tree. Clearing
  * logs re-ran it too.
  *
@@ -199,7 +199,7 @@ internal class StorageUsageViewModel(
                 }
                 UiState(
                     isLoading = false,
-                    shellSize = SessionStorage.directorySize(File(appContext.filesDir, "alpine-rootfs")),
+                    shellSize = SessionStorage.directorySize(File(appContext.filesDir, "debian-rootfs")),
                     dbSize = databaseSize(appContext),
                     logsCachesSize = LogsAndCachesCleaner.size(appContext),
                     orphanBytes = orphanScan.totalBytes,
@@ -220,7 +220,7 @@ internal class StorageUsageViewModel(
         shellStale = false
         viewModelScope.launch {
             val size = withContext(Dispatchers.IO) {
-                SessionStorage.directorySize(File(appContext.filesDir, "alpine-rootfs"))
+                SessionStorage.directorySize(File(appContext.filesDir, "debian-rootfs"))
             }
             _state.update { it.copy(shellSize = size) }
         }

@@ -36,7 +36,7 @@ Official website: **[openminis.app](https://openminis.app)**
 | | |
 |---|---|
 | **Bring your own model** | Claude, GPT, Gemini and other providers, via your own API keys or account sign-in. |
-| **A real Linux shell** | A sandboxed Alpine Linux environment runs on-device — the agent can install packages, run scripts, and work with real files. |
+| **A real Linux shell** | A sandboxed Linux environment runs on-device — Debian 12 (bookworm) on Android, Alpine via iSH on iOS — and the agent can install packages, run scripts, and work with real files. |
 | **Device integration** | Health, Calendar, Reminders, Contacts, HomeKit, Bluetooth, Clipboard, Media, Alarms and more, exposed to the agent as tools. |
 | **Browser automation** | The agent can browse and interact with the web on your behalf. |
 | **Skills & memory** | Extensible skills plus persistent memory across sessions. |
@@ -119,8 +119,10 @@ always carries the latest APK.
 ## Building from source
 
 Minis ships a Linux sandbox inside the app, so the native dependencies (iSH on
-iOS, PRoot on Android, FFmpeg, LAME, rclone) and the Alpine rootfs are **built
-from source** rather than committed as binaries.
+iOS, PRoot on Android, FFmpeg, LAME, rclone) and the iOS Alpine rootfs are
+**built from source** rather than committed as binaries; the Android sandbox
+instead boots the official `debian:bookworm-slim` layer, fetched from Docker Hub
+by the build script.
 
 **→ See [BUILDING.md](BUILDING.md) for the full first-build guide.**
 
@@ -177,7 +179,9 @@ terms, is in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 - **[PRoot](https://github.com/termux/proot)** (GPLv2) — user-space chroot for the
   Android sandbox, via [our fork](https://github.com/OpenMinis/proot);
   **[talloc](https://talloc.samba.org)** (LGPLv3+) underpins it.
-- **[Alpine Linux](https://alpinelinux.org)** — the minirootfs the sandbox boots.
+- **[Debian GNU/Linux](https://www.debian.org)** — the `bookworm-slim` rootfs the
+  Android sandbox boots.
+- **[Alpine Linux](https://alpinelinux.org)** — the minirootfs the iOS sandbox boots.
 
 **Media & text** — [FFmpeg](https://ffmpeg.org) (LGPL-2.1+),
 [LAME](https://lame.sourceforge.io) (LGPL), [cppjieba](https://github.com/yanyiwu/cppjieba) (MIT),

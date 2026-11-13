@@ -305,6 +305,12 @@ Get app paths and disk usage information.
 }
 ```
 
+The paths above are the **iOS** shape — the iSH rootfs lives at
+`~/Documents/alpine-rootfs`. On Android the sandbox rootfs is installed under
+`filesDir/debian-rootfs`, and `debug.appInfo` answers with Android-specific
+fields (device, `prootBooted`, `filesDir` and its disk usage) rather than
+`rootfsPath`/`dataPath`.
+
 **Example:**
 
 ```bash

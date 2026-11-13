@@ -72,7 +72,7 @@ class ProotFlagParityTest {
     @Test
     fun `the isolation flags match across both builders`() {
         // Beyond netlink: root emulation and the hardlink translation change
-        // what guest programs can do at all. `apk add binutils` needs
+        // what guest programs can do at all. `apt-get install -y binutils` needs
         // --link2symlink; -0 is what makes the guest believe it is root.
         for (flag in listOf("\"-0\"", "\"--link2symlink\"")) {
             assertTrue("PRootKernel must pass $flag", kernelBuilder.contains("cmd.add($flag)"))

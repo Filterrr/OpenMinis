@@ -304,7 +304,7 @@
     <string name="settings_env_vars">Omgevingsvariabelen</string>
     <string name="settings_env_vars_subtitle">Variabelen die in de sandbox worden geïnjecteerd</string>
     <string name="settings_section_storage">Opslag</string>
-    <string name="settings_storage_subtitle">Beheer de Alpine Linux-rootfs en blader door bestanden</string>
+    <string name="settings_storage_subtitle">Beheer de Debian Linux-rootfs en blader door bestanden</string>
     <string name="settings_section_permissions">Toestemmingen</string>
     <string name="settings_permissions_subtitle">Beheer de toegang van de agent tot privacygevoelige functies</string>
     <string name="settings_section_logs">Logboeken</string>
@@ -1004,7 +1004,7 @@
     <string name="rootfs_result_section">Resultaat</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">Over rootfs</string>
-    <string name="rootfs_about_description">De rootfs bevat het Alpine Linux-bestandssysteem dat de sandbox gebruikt. Resetten verwijdert alle gegevens en zet alles terug naar de fabrieksstatus.</string>
+    <string name="rootfs_about_description">De rootfs bevat het Debian Linux-bestandssysteem dat de sandbox gebruikt. Resetten verwijdert alle gegevens en zet alles terug naar de fabrieksstatus.</string>
     <string name="rootfs_about_operations">Resetten: alles verwijderen | Back-up: map /root bewaren | Herstellen: bewaarde gegevens terugzetten</string>
     <string name="rootfs_reset_confirm_title">Rootfs opnieuw instellen?</string>
     <string name="rootfs_reset_confirm_message">Hiermee wordt de volledige rootfs verwijderd. Alle gegevens gaan verloren.</string>
